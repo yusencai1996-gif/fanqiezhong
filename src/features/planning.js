@@ -67,10 +67,18 @@ export function planTodayHours(sessions, plan, now = new Date()) {
 
 // 今日所有进行中计划汇总
 // 返回 [{ plan, todayHours, doneHours, totalHours, isOverdue }]
-export function todayPlanSummary(sessions, plans, now = new Date()) {
+// v0.4.2:新增 subjects 参数——排除已归档科目下的计划(归档目标会级联归档科目但不动计划,
+// 计划自身 archived 保持 false,必须在这里按科目过滤;科目找不到=已彻底删除,同样排除)。
+// 不传 subjects(老调用)不过滤,保持向后兼容。注意第 3 参历史上曾是 now——用
+// Array.isArray 判断(而非真值),老式 3 参调用传 Date 进来时走不过滤分支而非崩溃。
+export function todayPlanSummary(sessions, plans, subjects = null, now = new Date()) {
   const result = []
   for (const plan of plans) {
     if (plan.status !== '进行中' || plan.archived) continue
+    if (Array.isArray(subjects)) {
+      const subj = subjects.find(s => s.id === plan.subjectId)
+      if (!subj || subj.archived) continue
+    }
     const todayHours = planTodayHours(sessions, plan, now)
     const doneHours = planDoneHours(sessions, plan)
     const todayDoneHours = subjectTodayHours(sessions, plan.subjectId, now)   // v0.3.9.1:今日该科目已学

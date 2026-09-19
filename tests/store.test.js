@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMemoryStore, migrateState, CURRENT_SCHEMA_VERSION, evaluateRecovery } from '../src/data/store.js'
+import { todayPlanSummary } from '../src/features/planning.js'
 
 describe('memory store', () => {
   let store
@@ -704,5 +705,21 @@ describe('异常退出恢复 v0.3.7', () => {
   it('recoverActiveFocus:无快照→返回null', () => {
     const store = createMemoryStore()
     expect(store.recoverActiveFocus()).toBeNull()
+  })
+
+  it('v0.4.2 集成回归:归档目标后,其名下进行中计划不进今日计划', () => {
+    // 2026-09-19 森哥实报bug:归档目标→科目级联归档但计划未动→今日计划仍显示。
+    // 本用例锁住 store 级联与展示过滤之间的链路(纯函数单测覆盖不到这层)。
+    const store = createMemoryStore()
+    store.addGoal({ name: '中级会计', deadline: '2026-12-20' })
+    const goalId = store.getState().goals[0].id
+    store.addSubject({ goalId, name: '实务' })
+    const subjectId = store.getState().subjects[0].id
+    store.addPlan({ subjectId, name: '第2轮', totalHours: 40, deadline: '2026-12-20' })
+    const s1 = store.getState()
+    expect(todayPlanSummary(s1.sessions, s1.plans, s1.subjects)).toHaveLength(1)   // 归档前:在
+    store.archiveGoal(goalId)
+    const s2 = store.getState()
+    expect(todayPlanSummary(s2.sessions, s2.plans, s2.subjects)).toHaveLength(0)   // 归档后:排除
   })
 })

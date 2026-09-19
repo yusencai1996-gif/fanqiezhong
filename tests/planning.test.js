@@ -78,13 +78,18 @@ describe('planning: planTodayHours', () => {
 })
 
 describe('planning: todayPlanSummary', () => {
+  const subjects = [
+    { id: 's1', goalId: 'g1', name: '英语', archived: false },
+    { id: 's2', goalId: 'g2', name: '会计', archived: false },
+    { id: 's3', goalId: 'g3', name: '政治', archived: false },
+  ]
   it('汇总所有进行中计划,跳过已完成/归档', () => {
     const plans = [
       { id: 'p1', subjectId: 's1', totalHours: 50, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false },
       { id: 'p2', subjectId: 's2', totalHours: 30, deadline: '2026-07-20', status: '已完成', manualDaily: {}, archived: false },
       { id: 'p3', subjectId: 's3', totalHours: 20, deadline: '2026-07-20', status: '进行中', manualDaily: {}, archived: true },
     ]
-    const summary = todayPlanSummary([], plans, now)
+    const summary = todayPlanSummary([], plans, subjects, now)
     expect(summary).toHaveLength(1)  // 只p1(p2已完成,p3归档)
     expect(summary[0].plan.id).toBe('p1')
     expect(summary[0]).toHaveProperty('todayHours')
@@ -93,8 +98,32 @@ describe('planning: todayPlanSummary', () => {
   })
   it('超期计划的isOverdue=true', () => {
     const plans = [{ id: 'p1', subjectId: 's1', totalHours: 50, deadline: '2026-07-10', status: '进行中', manualDaily: {}, archived: false }]
-    const summary = todayPlanSummary([], plans, now)
+    const summary = todayPlanSummary([], plans, subjects, now)
     expect(summary[0].isOverdue).toBe(true)
+  })
+  it('v0.4.2:科目已归档(含归档目标级联)的计划不进今日计划', () => {
+    // 森哥实报bug:归档目标→科目级联归档,但计划本身未归档,旧逻辑漏进今日计划
+    const subjWithArchived = [
+      { id: 's1', goalId: 'g1', name: '英语', archived: false },
+      { id: 's2', goalId: 'g2', name: '中级会计', archived: true },
+    ]
+    const plans = [
+      { id: 'p1', subjectId: 's1', totalHours: 50, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false },
+      { id: 'p2', subjectId: 's2', totalHours: 40, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false },
+    ]
+    const summary = todayPlanSummary([], plans, subjWithArchived, now)
+    expect(summary).toHaveLength(1)
+    expect(summary[0].plan.id).toBe('p1')
+  })
+  it('v0.4.2:科目已被彻底删除(找不到)的计划不进今日计划', () => {
+    const plans = [{ id: 'p1', subjectId: 'ghost', totalHours: 50, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false }]
+    const summary = todayPlanSummary([], plans, [{ id: 's1', archived: false }], now)
+    expect(summary).toHaveLength(0)
+  })
+  it('v0.4.2:不传 subjects(老调用)不过滤,保持向后兼容', () => {
+    const plans = [{ id: 'p1', subjectId: 's2', totalHours: 50, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false }]
+    const summary = todayPlanSummary([], plans, undefined, now)
+    expect(summary).toHaveLength(1)
   })
 })
 
@@ -124,7 +153,7 @@ describe('planning: subjectTodayHours 今日已学', () => {
   it('todayPlanSummary 含 todayDoneHours 字段', () => {
     const plans = [{ id: 'p1', subjectId: 's1', totalHours: 50, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false }]
     const s = [todaySess('s1', 2)]
-    const summary = todayPlanSummary(s, plans, now)
+    const summary = todayPlanSummary(s, plans, [{ id: 's1', archived: false }], now)
     expect(summary[0]).toHaveProperty('todayDoneHours')
     expect(summary[0].todayDoneHours).toBe(2)
   })
@@ -135,7 +164,7 @@ describe('planning: subjectTodayHours 今日已学', () => {
       { id: 'p2', subjectId: 's1', totalHours: 30, deadline: '2026-07-25', status: '进行中', manualDaily: {}, archived: false },
     ]
     const s = [todaySess('s1', 2)]
-    const summary = todayPlanSummary(s, plans, now)
+    const summary = todayPlanSummary(s, plans, [{ id: 's1', archived: false }], now)
     expect(summary).toHaveLength(2)
     expect(summary[0].todayDoneHours).toBe(2)
     expect(summary[1].todayDoneHours).toBe(2)   // 同科目今日已学相同(UI侧todayPct此时不显示百分比)

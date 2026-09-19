@@ -32,7 +32,7 @@ export default function CheckinPanel({ sessions, plans, subjects, dailyGoalMinut
   const todayEval = evaluateDay(sessions, now, goalMin, now)
   const todaySummary = summarizeToday(sessions, now)
   // 今日计划进度(参考)
-  const planSummary = todayPlanSummary(sessions, plans, now)
+  const planSummary = todayPlanSummary(sessions, plans, subjects, now)
 
   // 月份切换
   const prevMonth = () => {

@@ -6,7 +6,7 @@ import { ListChecks, Target, BookOpen } from 'lucide-react'
 import './TodayPlanPanel.css'
 
 export default function TodayPlanPanel({ sessions, plans, subjects, onOpenGoalManager }) {
-  const summary = useMemo(() => todayPlanSummary(sessions, plans), [sessions, plans])
+  const summary = useMemo(() => todayPlanSummary(sessions, plans, subjects), [sessions, plans, subjects])
   const totalToday = summary.reduce((s, x) => s + x.todayHours, 0)
   // 今日总专注(含自由专注,不按科目过滤)——防止"按科目的todayDoneHours"漏算自由专注造成困惑
   const totalDoneSec = useMemo(() => summarizeToday(sessions).totalSec, [sessions])
