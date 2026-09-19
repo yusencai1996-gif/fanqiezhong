@@ -4,6 +4,33 @@
 
 桌面端番茄钟 + 目标管理工具。不只是倒计时,而是结合待办清单 + 目标计划 + 数据统计,帮你看清每天的时间去向。
 
+## 📸 界面预览
+
+*以下截图均为演示数据。*
+
+<p align="center">
+  <img src="docs/screenshots/main.png" width="840" alt="主界面:左侧待办清单(目标/科目/任务分组),右侧计时器 + 目标倒计时 + 今日小结">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/stats.png" alt="数据统计:今日概览 + 趋势图 + 任务时长排行"></td>
+    <td width="50%"><img src="docs/screenshots/checkin.png" alt="打卡表:日历热力图 + 连续打卡"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>数据统计</b> · 时间花哪去了</td>
+    <td align="center"><b>打卡表</b> · 日历热力图</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/progress.png" alt="进度预测:目标总进度 + 双速率完成预测"></td>
+    <td><img src="docs/screenshots/burndown.png" alt="燃尽图:理想线 vs 实际投入"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>进度预测</b> · 双速率预测完成日</td>
+    <td align="center"><b>燃尽图</b> · 实际 vs 理想投入</td>
+  </tr>
+</table>
+
 ## ✨ 功能
 
 ### ⏱️ 计时核心
