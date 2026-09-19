@@ -1,0 +1,35 @@
+/* 今日计划面板 */
+.today-plan {
+  width: 100%; max-width: 520px;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-md);
+}
+.today-plan--empty { text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.today-plan__link { color: var(--color-primary); cursor: pointer; text-decoration: underline; }
+
+.today-plan__head {
+  font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+.today-plan__list { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.today-plan__item {
+  display: flex; gap: var(--space-md); align-items: center;
+  padding: 6px 0;
+}
+.today-plan__item--overdue .today-plan__name { color: var(--color-primary); }
+
+.today-plan__main { flex: 1; min-width: 0; }
+.today-plan__name { font-size: var(--font-size-sm); color: var(--color-text); margin-bottom: 4px; }
+.today-plan__overdue {
+  font-size: 10px; color: white; background: var(--color-primary);
+  padding: 0 6px; border-radius: var(--radius-pill); margin-left: 6px;
+}
+.today-plan__bar-bg {
+  height: 5px; background: var(--bar-track); border-radius: var(--bar-radius); overflow: hidden;   /* #5 进度条token */
+}
+.today-plan__bar { height: 100%; background: var(--color-primary); border-radius: var(--bar-radius); transition: var(--bar-transition); }
+
+.today-plan__meta { flex-shrink: 0; text-align: right; font-size: 12px; }
+.today-plan__meta strong { color: var(--color-primary); }
+.today-plan__sub { color: var(--color-text-muted); font-size: 11px; }

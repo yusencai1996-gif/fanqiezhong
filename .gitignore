@@ -1,0 +1,36 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+dist-electron/
+
+# 打包发布产物(免安装版体积大,不进版本管理)
+release/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Electron
+out/
+
+# 临时/备份
+*.bak
+*.tmp
+nul
+
+# 私人文件(仅本机使用,不进仓库)
+AGENTS.md
+启动番茄钟.bat
+.zcode/

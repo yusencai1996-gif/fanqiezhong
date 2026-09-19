@@ -1,0 +1,120 @@
+/* 打卡表面板 —— 引用 global.css token,风格与 StatsPanel 一致 */
+.checkin-overlay {
+  position: fixed; inset: 0;
+  background: oklch(0.10 0.01 270 / 0.7);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+  animation: checkinFadeIn 180ms var(--ease);
+}
+@keyframes checkinFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.checkin-panel {
+  background: var(--color-surface);
+  width: 640px; max-width: 90vw; max-height: 88vh;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  display: flex; flex-direction: column; gap: var(--space-lg);
+  animation: checkinSlideUp 180ms var(--ease);
+}
+@keyframes checkinSlideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.checkin-header { display: flex; justify-content: space-between; align-items: center; }
+.checkin-header h2 { font-size: var(--font-size-lg); font-weight: 500; }
+.checkin-close {
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--color-text-muted); font-size: 22px; cursor: pointer;
+  border-radius: var(--radius-sm); transition: var(--transition);
+}
+.checkin-close:hover { background: var(--color-bg); color: var(--color-text); }
+
+/* 顶部卡片:连续打卡 + 今日状态 */
+.checkin-topcards { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-md); }
+.checkin-streak-card {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-md);
+  text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center;
+}
+.checkin-streak-card__value { font-size: 28px; font-weight: 600; color: var(--color-primary); }
+.checkin-streak-card__label { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+.checkin-today-card {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-md);
+  display: flex; flex-direction: column; gap: 4px; justify-content: center;
+}
+.checkin-today-card--done { border-color: var(--color-success); }
+.checkin-today-card--partial { border-color: var(--color-warning); }
+.checkin-today-card--missed { border-color: var(--color-danger); }
+.checkin-today-card__status { font-size: var(--font-size-md); font-weight: 600; }
+.checkin-today-card--done .checkin-today-card__status { color: var(--color-success); }
+.checkin-today-card--partial .checkin-today-card__status { color: var(--color-warning); }
+.checkin-today-card--missed .checkin-today-card__status { color: var(--color-danger); }
+.checkin-today-card__detail { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+.checkin-today-card__hint { font-size: var(--font-size-sm); color: var(--color-primary); }
+
+/* 日历热力图 */
+.checkin-calendar {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-md);
+  display: flex; flex-direction: column; gap: var(--space-sm);
+}
+.cal-nav { display: flex; align-items: center; gap: var(--space-sm); justify-content: center; position: relative; }
+.cal-nav__btn {
+  width: 28px; height: 28px; border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text-muted); font-size: 18px; cursor: pointer;
+  border-radius: var(--radius-sm); transition: var(--transition); line-height: 1;
+}
+.cal-nav__btn:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.cal-nav__label { font-size: var(--font-size-md); font-weight: 500; min-width: 120px; text-align: center; }
+.cal-nav__back {
+  position: absolute; right: 0; border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-primary); font-size: var(--font-size-sm); padding: 4px 10px; cursor: pointer;
+  border-radius: var(--radius-sm); transition: var(--transition);
+}
+.cal-nav__back:hover { background: var(--color-surface-hover); }
+
+.cal-weeklabels { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-weeklabel { text-align: center; font-size: 12px; color: var(--color-text-muted); padding: 2px 0; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-cell {
+  aspect-ratio: 1 / 1; min-width: 0;
+  border-radius: 8px; border: 1px solid transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; font-size: var(--font-size-sm); transition: var(--transition);
+  cursor: default;
+}
+.cal-cell--blank { background: transparent; border: none; }
+.cal-cell--done { background: var(--color-success-soft); border-color: var(--color-success); color: var(--color-success); }
+.cal-cell--partial { background: var(--color-warning-soft); border-color: var(--color-warning); color: var(--color-warning); }
+.cal-cell--missed { background: var(--color-danger-soft); border-color: transparent; color: var(--color-text-muted); }
+.cal-cell--future { background: transparent; color: var(--color-text-muted); opacity: 0.5; }
+.cal-cell--today { outline: 2px solid var(--color-primary); outline-offset: -2px; font-weight: 600; }
+.cal-cell__day { line-height: 1; }
+.cal-cell__dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; margin-top: 2px; opacity: 0.7; }
+.cal-cell--missed .cal-cell__dot, .cal-cell--future .cal-cell__dot { display: none; }
+
+/* 图例 */
+.cal-legend { display: flex; gap: var(--space-md); justify-content: center; flex-wrap: wrap; padding-top: 4px; }
+.cal-legend__item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-text-muted); }
+.cal-legend__box { width: 12px; height: 12px; border-radius: 4px; display: inline-block; border: 1px solid transparent; }
+
+.cal-monthstat { text-align: center; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+.cal-monthstat b { color: var(--color-text); font-weight: 600; }
+
+/* 今日计划参考(只读) */
+.checkin-planref { display: flex; flex-direction: column; gap: var(--space-sm); }
+.checkin-planref__title { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+.checkin-planref__item {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md);
+}
+.checkin-planref__head { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-size-sm); margin-bottom: 6px; }
+.checkin-planref__today { color: var(--color-text-muted); font-size: 12px; }
+.checkin-planref__overdue { color: var(--color-danger); font-size: 12px; }
+.checkin-planref__bar { height: 6px; background: var(--bar-track); border-radius: var(--bar-radius); overflow: hidden; }
+.checkin-planref__bar-fill { height: 100%; background: var(--color-primary); border-radius: var(--bar-radius); transition: var(--bar-transition); }
+.checkin-planref__meta { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }

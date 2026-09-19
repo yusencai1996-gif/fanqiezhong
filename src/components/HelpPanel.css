@@ -1,0 +1,58 @@
+/* 使用说明面板 —— 复用其他弹层模板(overlay z-index 50) */
+.help-overlay {
+  position: fixed; inset: 0;
+  background: oklch(0.10 0.01 270 / 0.7);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+  animation: helpFade 180ms var(--ease);
+}
+@keyframes helpFade { from { opacity: 0; } to { opacity: 1; } }
+
+.help-panel {
+  background: var(--color-surface);
+  width: 640px; max-width: 90vw; max-height: 88vh;
+  display: flex; flex-direction: column;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  animation: helpSlide 180ms var(--ease);
+}
+@keyframes helpSlide { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.help-header { display: flex; justify-content: space-between; align-items: center; padding: var(--space-lg); border-bottom: 1px solid var(--color-border); }
+.help-header h2 { font-size: var(--font-size-lg); font-weight: 500; }
+.help-close { width: 28px; height: 28px; border: none; background: none; color: var(--color-text-muted); font-size: 22px; cursor: pointer; border-radius: var(--radius-sm); transition: var(--transition); line-height: 1; }
+.help-close:hover { background: var(--color-bg); color: var(--color-text); }
+
+.help-scroll { padding: var(--space-lg); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-lg); }
+
+.help-section { display: flex; flex-direction: column; gap: var(--space-sm); }
+.help-section h3 { font-size: var(--font-size-md); font-weight: 500; color: var(--color-text); display: flex; align-items: center; gap: 6px; }
+.help-section h3 svg { color: var(--color-primary); }
+
+.help-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.help-steps li { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.6; }
+.help-steps strong { color: var(--color-text); }
+
+.help-concept { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.6; display: flex; flex-direction: column; gap: 6px; }
+.help-tree { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); font-family: var(--font-family-mono); font-size: 12px; color: var(--color-text); white-space: pre-wrap; }
+
+.help-note { font-size: var(--font-size-sm); color: var(--color-text-muted); background: var(--color-bg); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); line-height: 1.6; }
+.help-note b { color: var(--color-text); }
+.help-subtitle { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+.help-flow { display: flex; flex-direction: column; gap: var(--space-sm); }
+.help-flow-item { background: var(--color-bg); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); }
+.help-flow-item strong { font-size: var(--font-size-sm); color: var(--color-text); }
+.help-flow-item p { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.6; margin-top: 4px; }
+.help-flow-item b { color: var(--color-text); }
+
+.help-modules { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.help-modules li { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.6; }
+.help-modules strong { color: var(--color-text); }
+
+.help-faq { display: flex; flex-direction: column; gap: 10px; list-style: none; padding: 0; }
+.help-faq li { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.6; background: var(--color-bg); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); }
+.help-faq strong { color: var(--color-text); display: block; margin-bottom: 2px; }
+
+kbd { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-family-mono); font-size: 12px; color: var(--color-text); }

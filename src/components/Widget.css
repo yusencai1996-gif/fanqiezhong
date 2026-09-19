@@ -1,0 +1,42 @@
+/* 小插件 —— 极简浮窗,引用 global.css token */
+.widget {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  /* 允许拖动窗口(点空白处拖) */
+  -webkit-app-region: drag;
+  cursor: move;
+}
+/* 按钮不参与拖动 */
+.widget__btn { -webkit-app-region: no-drag; }
+
+.widget__mode {
+  font-size: 11px; color: var(--color-text-muted);
+  font-weight: 500;
+}
+.widget__clock {
+  font-size: 32px; font-weight: 200;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.widget--break .widget__clock { color: var(--color-break); }
+
+.widget__btn {
+  width: 28px; height: 28px;
+  border: none; border-radius: 50%;
+  cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+  color: white;
+}
+.widget__btn--start { background: var(--color-primary); }
+.widget__btn--start:hover { background: var(--color-primary-hover); transform: scale(1.1); }
+.widget__btn--pause { background: var(--color-text-muted); }
+.widget__btn--pause:hover { transform: scale(1.1); }

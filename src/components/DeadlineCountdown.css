@@ -1,0 +1,24 @@
+/* 倒计时行 —— 轻量(和TodaySummary协调),强调时间紧迫 */
+.countdown {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.countdown:hover { background: var(--color-surface-hover); }
+.countdown strong { color: var(--color-primary); font-weight: 600; }
+
+/* 过期:红字警示 */
+.countdown--overdue strong { color: var(--color-danger); }
+.countdown--overdue { border-color: var(--color-danger); }
+
+/* 今天截止:主色强调 */
+.countdown--today strong { color: var(--color-primary); }
+.countdown--today { border-color: var(--color-primary); }

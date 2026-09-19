@@ -1,0 +1,126 @@
+/* 统计面板 —— 引用 global.css token */
+.stats-overlay {
+  position: fixed; inset: 0;
+  background: oklch(0.10 0.01 270 / 0.7);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+  animation: fadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.stats-panel {
+  background: var(--color-surface);
+  width: 640px; max-width: 90vw; max-height: 88vh;   /* #3 归档:标准640(原600) */
+  overflow-y: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  display: flex; flex-direction: column; gap: var(--space-lg);
+  animation: slideUp 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.stats-header { display: flex; justify-content: space-between; align-items: center; }
+.stats-header h2 { font-size: var(--font-size-lg); font-weight: 500; }
+.stats-close {
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--color-text-muted); font-size: 22px; cursor: pointer;
+  border-radius: var(--radius-sm); transition: var(--transition);
+}
+.stats-close:hover { background: var(--color-bg); color: var(--color-text); }
+
+/* 概览卡片 */
+.stats-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); }
+.stat-card {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: var(--space-md);
+  text-align: center;
+}
+.stat-card__value {
+  font-size: 24px; font-weight: 500; color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+.stat-card__label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
+
+/* 区块 */
+.stats-section { display: flex; flex-direction: column; gap: var(--space-md); }
+.stats-section__title { font-size: var(--font-size-md); font-weight: 500; color: var(--color-text); }
+.stats-empty { color: var(--color-text-muted); font-size: var(--font-size-sm); padding: var(--space-md); text-align: center; }
+
+/* 柱状图 */
+/* 时间范围 tab */
+.range-tabs { display: flex; gap: 2px; background: var(--color-bg); border-radius: var(--radius-sm); padding: 2px; }
+.range-tab {
+  font-size: 12px; padding: 4px 12px; border: none;
+  background: transparent; color: var(--color-text-muted);
+  border-radius: calc(var(--radius-sm) - 2px); cursor: pointer;
+  transition: var(--transition); font-family: var(--font-family);
+}
+.range-tab:hover { color: var(--color-text); }
+.range-tab--active { background: var(--color-surface); color: var(--color-primary); box-shadow: var(--shadow-sm); }
+
+.chart {
+  display: flex; align-items: flex-end; gap: var(--space-sm);
+  height: 140px; padding: var(--space-sm) 0;
+}
+/* 月视图柱子多(30根),缩窄间距和柱宽 */
+.chart--dense { gap: 2px; }
+.chart--dense .chart__bar { width: 90%; }
+.chart__summary { font-size: var(--font-size-sm); color: var(--color-text-muted); text-align: center; }
+.chart__summary strong { color: var(--color-text); }
+.chart__col {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  height: 100%;
+}
+.chart__bar-wrap {
+  flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;
+}
+.chart__bar {
+  width: 70%; min-height: 2px;
+  background: linear-gradient(180deg, var(--color-primary), oklch(0.52 0.20 28));
+  border-radius: 6px 6px 2px 2px;
+  position: relative;
+  transition: height 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 4px;
+}
+.chart__bar-label {
+  font-size: 10px; color: white; font-weight: 500;
+}
+.chart__day {
+  font-size: 11px; color: var(--color-text-muted);
+  width: 100%; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: clip;
+  height: 14px; line-height: 14px;  /* 固定高度避免空标签行高抖动 */
+}
+
+/* 任务排行 */
+.task-rank { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
+.task-rank__item {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+.task-rank__no {
+  width: 22px; height: 22px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: 50%; font-size: 11px; color: var(--color-text-muted);
+}
+.task-rank__main { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.task-rank__title {
+  font-size: var(--font-size-sm); color: var(--color-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.task-rank__bar-bg {
+  height: 6px; background: var(--bar-track); border-radius: var(--bar-radius); overflow: hidden;   /* #5 进度条token(自审补漏) */
+}
+.task-rank__bar {
+  height: 100%; background: var(--color-primary); border-radius: var(--bar-radius);
+  transition: var(--bar-transition);
+}
+.task-rank__time {
+  font-size: var(--font-size-sm); color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+  font-family: var(--font-family-mono);
+}

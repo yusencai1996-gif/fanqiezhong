@@ -1,0 +1,173 @@
+/* 左侧任务清单 —— 引用 global.css 的 token,换主题只改 token */
+.task-list {
+  width: 300px;
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-lg) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  gap: var(--space-md);
+}
+.task-list__title {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+.task-list__items { list-style: none; flex: 1; overflow-y: auto; margin: 0 calc(var(--space-md) * -1); padding: 0 var(--space-md); }
+.task-list__items::-webkit-scrollbar { width: 6px; }
+.task-list__items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+/* v0.3.0: 科目分组 */
+.task-group { list-style: none; margin-bottom: var(--space-sm); }
+.task-group__head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer; user-select: none;
+  color: var(--color-text-muted); font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: var(--transition);
+}
+.task-group__head:hover { background: var(--color-bg); color: var(--color-text); }
+.task-group__toggle { font-size: 10px; width: 12px; }
+.task-group__name { flex: 1; }
+.task-group__count {
+  font-size: 11px; color: var(--color-text-muted);
+  background: var(--color-bg); border-radius: var(--radius-pill);
+  padding: 0 8px; min-width: 18px; text-align: center;
+}
+.task-list__items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+.task-list__add input {
+  width: 100%; padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm); font-family: var(--font-family);
+  transition: var(--transition);
+}
+.task-list__add input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px oklch(0.62 0.19 28 / 0.15);
+}
+.task-list__add input::placeholder { color: var(--color-text-muted); }
+
+.task-item {
+  /* v0.3.16:纵向布局——两行堆叠(顶行=标题,底行=标签/按钮) */
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 4px;
+  transition: var(--transition);
+  border: 1px solid transparent;
+}
+.task-item:hover { background: var(--color-bg); }
+.task-item--active {
+  background: oklch(0.62 0.19 28 / 0.12);
+  border-color: oklch(0.62 0.19 28 / 0.3);
+}
+/* 顶行:checkbox + 标题 + 活跃点 */
+.task-item__row--top { display: flex; align-items: flex-start; gap: var(--space-sm); }
+/* 底行:标签(左) + 按钮(右);标签为空时按钮也靠右 */
+.task-item__row--bottom { display: flex; align-items: center; gap: var(--space-sm); padding-left: 24px; /* 对齐checkbox右侧 */ }
+.task-item input[type="checkbox"] {
+  width: 16px; height: 16px; margin-top: 2px;   /* 与标题首行视觉对齐 */
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.task-item__title {
+  flex: 1; min-width: 0;
+  font-size: var(--font-size-sm);
+  word-break: break-word;   /* 长文本自动换行 */
+  line-height: 1.35;
+}
+.task-item__done { text-decoration: line-through; color: var(--color-text-muted); }
+.task-item__dot { color: var(--color-primary); font-size: 10px; flex-shrink: 0; align-self: center; }
+.task-item__del {
+  background: none; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px;
+  opacity: 0; transition: var(--transition);
+}
+.task-item:hover .task-item__del { opacity: 1; }
+.task-item__del:hover { color: var(--color-primary); }
+
+/* 任务项底部行的标签区(左):空时也占位撑开,保证按钮永远靠右 */
+.task-item__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.task-item__row--bottom .task-item__tags { flex: 1; min-width: 0; }
+.tag {
+  font-size: 11px; color: var(--color-primary);
+  background: oklch(0.62 0.19 28 / 0.12);
+  padding: 1px 6px; border-radius: var(--radius-pill);
+  cursor: pointer; transition: var(--transition);
+  border: 1px solid oklch(0.62 0.19 28 / 0.2);
+}
+.tag:hover { background: oklch(0.62 0.19 28 / 0.25); }
+.tag::before { content: ''; }
+
+/* 标签输入 */
+.tag-input-wrap { margin-top: 2px; }
+.tag-input {
+  width: 100%; padding: 3px 6px; font-size: 11px;
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-primary); border-radius: 6px;
+  font-family: var(--font-family);
+}
+.tag-input:focus { outline: none; box-shadow: 0 0 0 2px oklch(0.62 0.19 28 / 0.2); }
+
+/* 任务项右侧操作按钮组 */
+.task-item__actions { display: flex; align-items: center; gap: 2px; opacity: 0; transition: var(--transition); }
+.task-item:hover .task-item__actions { opacity: 1; }
+.task-item__tag-btn {
+  background: none; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 14px; padding: 0 4px; font-weight: 600;
+  transition: var(--transition);
+}
+.task-item__tag-btn:hover { color: var(--color-primary); }
+
+/* v0.3.0: 归属科目按钮 */
+.task-item__subject-btn {
+  background: none; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 11px; padding: 0 3px; opacity: 0.7;
+  transition: var(--transition);
+}
+.task-item__subject-btn:hover { opacity: 1; }
+.task-item__subject-btn--set { opacity: 1; color: var(--color-break); }
+.task-item__subject-btn--archived { opacity: 0.5; color: var(--color-text-muted); }
+.subject-select-wrap { margin-top: 2px; }
+.subject-select {
+  font-size: 11px; padding: 3px 6px;
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-primary); border-radius: 6px;
+  font-family: var(--font-family);
+}
+.subject-select:focus { outline: none; box-shadow: 0 0 0 2px oklch(0.62 0.19 28 / 0.2); }
+.task-item__sort-btn {
+  background: none; border: none; color: var(--color-text-muted);
+  cursor: pointer; padding: 4px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px; border-radius: 4px;
+  transition: var(--transition);
+}
+.task-item__sort-btn:hover:not(:disabled) { color: var(--color-primary); background: var(--color-bg); }
+.task-item__sort-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* 标签筛选栏 */
+.task-list__filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.filter-chip {
+  font-size: 11px; padding: 3px 10px;
+  background: var(--color-bg); color: var(--color-text-muted);
+  border: 1px solid var(--color-border); border-radius: var(--radius-pill);
+  cursor: pointer; transition: var(--transition); font-family: var(--font-family);
+}
+.filter-chip:hover { color: var(--color-text); border-color: var(--color-text-muted); }
+.filter-chip--active {
+  background: oklch(0.62 0.19 28 / 0.15); color: var(--color-primary);
+  border-color: oklch(0.62 0.19 28 / 0.4);
+}
+
+.task-list__empty {
+  text-align: center; color: var(--color-text-muted);
+  font-size: var(--font-size-sm); padding: var(--space-lg) var(--space-md);
+  list-style: none;
+}

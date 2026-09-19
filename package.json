@@ -1,0 +1,68 @@
+{
+  "name": "pomodoro",
+  "version": "0.4.1",
+  "description": "桌面番茄钟 + 目标管理工具:专注计时、待办任务、目标计划、数据统计",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist": "vite build && electron-builder --win nsis --ia32 --x64"
+  },
+  "author": "yusencai1996-gif",
+  "license": "MIT",
+  "build": {
+    "appId": "com.xiaokong.pomodoro",
+    "productName": "番茄钟",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/tray.png",
+        "to": "tray.png"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "番茄钟"
+    }
+  },
+  "dependencies": {
+    "lucide-react": "^1.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9",
+    "wait-on": "^9.0.10"
+  }
+}

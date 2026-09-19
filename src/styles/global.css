@@ -1,0 +1,212 @@
+/* ============================================
+ * 设计 token —— 套用 frontend-design 技能审美
+ * 风格:番茄朱砂红点睛 + 深浅双主题(跟随系统自动切换)
+ * 换主题只改这里,组件自动跟着变(界面与样式分离)。
+ * 主色(朱砂/青瓷)深浅通用,背景/文字/边框/阴影按主题分。
+ * ============================================ */
+
+/* 共享 token:字体/间距/圆角/动效(深浅通用) */
+:root {
+  /* 主色:番茄朱砂(计时数字/CTA/激活态) — 深浅通用,稀缺资源克制使用 */
+  --color-primary: oklch(0.62 0.19 28);
+  --color-primary-hover: oklch(0.56 0.20 28);
+  /* 休息态:青瓷绿 */
+  --color-break: oklch(0.62 0.10 165);
+  /* 语义色(v0.3.8 打卡表):绿=成功/黄=部分/红=缺勤。深浅通用,色相固定明度适中 */
+  --color-success: oklch(0.65 0.15 150);   /* 翠绿:打卡成功 */
+  --color-warning: oklch(0.75 0.14 75);    /* 琥珀黄:部分完成 */
+  --color-danger: oklch(0.62 0.18 25);     /* 朱红:缺勤(与主色同色相,略高饱和) */
+  /* 语义色的浅化填充(日历格子背景用,避免大面积纯色刺眼) */
+  --color-success-soft: oklch(0.65 0.15 150 / 0.22);
+  --color-warning-soft: oklch(0.75 0.14 75 / 0.22);
+  --color-danger-soft: oklch(0.62 0.18 25 / 0.18);
+
+  --font-family: "Outfit", "Noto Sans SC", "Source Han Sans SC", -apple-system, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* v0.3.15 字号随窗口缩放(clamp):小窗口不挤、大窗口不空。
+     基准校准:960×640(默认)时各值=原固定值,760(最小)缩小,1280+(大窗口)放大。
+     用 vw+vh 混合驱动,避免宽矮/窄高窗口失真。 */
+  --font-size-sm: clamp(11px, 1.0vw + 0.53vh, 15px);
+  --font-size-md: clamp(13px, 1.2vw + 0.56vh, 18px);
+  --font-size-lg: clamp(17px, 1.6vw + 0.75vh, 24px);
+  --font-size-xl: clamp(40px, 4.5vw + 2.0vh, 64px);   /* 计时数字:960时=56px(同原值),760缩到44,1280+放到64 */
+
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-pill: 980px;
+
+  /* 进度条 token(v0.3.9.3 小码审核#5):统一各处进度条的圆角/动画/底色 */
+  --bar-radius: var(--radius-pill);   /* 进度条统一用胶囊圆角 */
+  --bar-track: var(--color-surface);  /* 进度条轨道底色 */
+  --bar-transition: width 300ms var(--ease);   /* 进度条填充动画统一 */
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 180ms var(--ease);
+
+  color-scheme: light dark;
+}
+
+/* 浅色主题(默认):暖纸浅底,温润护眼 */
+:root {
+  --color-bg: oklch(0.97 0.008 80);          /* 暖纸底,微黄不刺眼 */
+  --color-surface: oklch(0.99 0.005 80);     /* 卡片:接近白 */
+  --color-surface-hover: oklch(0.95 0.01 80);
+  --color-text: oklch(0.25 0.02 270);        /* 墨蓝近黑文字 */
+  --color-text-muted: oklch(0.50 0.015 270); /* 次墨 */
+  --color-border: oklch(0.88 0.01 80);       /* 浅边框 */
+  --shadow-sm: 0 1px 3px oklch(0.40 0.02 270 / 0.08);
+  --shadow-md: 0 4px 12px oklch(0.40 0.02 270 / 0.12);
+}
+
+/* 深色主题(系统是深色时):暖墨沉静底,非纯黑带色温 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: oklch(0.18 0.012 270);         /* 暖墨近黑 */
+    --color-surface: oklch(0.23 0.014 270);
+    --color-surface-hover: oklch(0.27 0.014 270);
+    --color-text: oklch(0.92 0.005 270);       /* 暖白 */
+    --color-text-muted: oklch(0.65 0.012 270);
+    --color-border: oklch(0.32 0.014 270 / 0.6); /* 半透明,暗色精致感 */
+    --shadow-sm: 0 1px 2px oklch(0.10 0.02 270 / 0.4);
+    --shadow-md: 0 4px 12px oklch(0.10 0.02 270 / 0.5);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* lucide 图标(inline SVG)垂直对齐(小码审核根因:全项目无vertical-align,SVG默认baseline导致图标"沉下去")。
+   svg.lucide 精准选择器(lucide-react 给图标加 class="lucide lucide-xxx"),不影响燃尽图手写<path>。
+   -0.125em 比 middle 更贴视觉中心,中英文混排都稳。 */
+svg.lucide { vertical-align: -0.125em; flex-shrink: 0; }
+/* 图标和紧邻文字之间留间距(避免贴太紧) */
+.btn svg.lucide, .app__icon-btn svg.lucide, h2 svg.lucide, .timer__mode svg.lucide,
+.widget__mode svg.lucide, .goal-tab svg.lucide, .subject-item__name svg.lucide,
+.archive-sub__name svg.lucide, .archive-group__name svg.lucide, .pf-overall__name svg.lucide,
+.pf-forecast__name svg.lucide, .pf-subject__name svg.lucide, .checkin-planref__head svg.lucide,
+.checkin-streak-card__value svg.lucide, .pf-goal-tab svg.lucide, .task-list__title svg.lucide,
+.today-plan__head svg.lucide, .today-plan__name svg.lucide, .checkin-planref__title svg.lucide,
+.app__recovery-banner svg.lucide, .task-group__name svg.lucide {
+  margin-right: 4px;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  /* 中文行高 1.75~2.0(比英文宽松,见 chinese-design.md) */
+  line-height: 1.75;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* app 布局 */
+.app { display: flex; height: 100vh; }
+.app__main {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-md);
+  /* v0.3.12 修:内容居中时若总高度接近视口,底部TodayPlanPanel会贴窗口底显得"重合"。
+     加 padding 让底部留白,内容整体微上移(森哥反馈视觉怪)。 */
+  /* v0.3.15:顶部留安全区给悬浮顶栏(防计时区顶部内容和顶栏按钮重叠) */
+  padding: calc(var(--space-lg) + 44px) var(--space-md) var(--space-lg);
+}
+
+/* v0.3.7 异常退出恢复提示 banner(顶部,显示8秒后消失) */
+.app__recovery-banner {
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-sm);
+  box-shadow: var(--shadow-sm);
+  animation: recovery-fade-in 0.3s var(--ease);
+}
+@keyframes recovery-fade-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 右上角按钮组(统计 + 设置) */
+.app__topbar {
+  position: fixed; top: var(--space-md); right: var(--space-md);
+  display: flex; gap: var(--space-sm); align-items: center;
+}
+/* #8 分隔线:设置按钮与查看类按钮的视觉分组 */
+.app__topbar-sep {
+  width: 1px; height: clamp(16px, 1.6vw + 0.6vh, 24px); background: var(--color-border); margin: 0 2px;   /* v0.3.15:随窗口缩放 */
+}
+.app__icon-btn {
+  width: clamp(30px, 2.8vw + 1.4vh, 42px); height: clamp(30px, 2.8vw + 1.4vh, 42px);   /* v0.3.15:按钮随窗口缩放(960时≈36px) */
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); color: var(--color-text-muted);
+  font-size: 16px; cursor: pointer;
+  transition: var(--transition);
+}
+.app__icon-btn:hover { color: var(--color-text); background: var(--color-surface-hover); }
+/* v0.3.15:顶栏图标尺寸随窗口缩放(覆盖lucide的固定size,960时≈18px) */
+.app__icon-btn svg.lucide { width: clamp(14px, 1.5vw + 0.55vh, 22px) !important; height: clamp(14px, 1.5vw + 0.55vh, 22px) !important; }
+
+/* v0.3.15:小窗口折叠菜单(窄屏时6按钮折叠成1个☰+下拉) */
+.app__topbar-menu { position: relative; }
+.app__menu-overlay { position: fixed; inset: 0; z-index: 40; }   /* 点击外部关闭的透明遮罩 */
+.app__menu-dropdown {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 6px; min-width: 160px; z-index: 50;
+  display: flex; flex-direction: column; gap: 2px;
+  animation: helpFade 120ms var(--ease);
+}
+.app__menu-dropdown button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border: none; background: none;
+  color: var(--color-text); font-size: var(--font-size-sm); cursor: pointer;
+  border-radius: var(--radius-sm); transition: var(--transition); text-align: left;
+}
+.app__menu-dropdown button:hover { background: var(--color-bg); }
+.app__menu-dropdown button svg { color: var(--color-text-muted); }
+.app__menu-sep { height: 1px; background: var(--color-border); margin: 4px 0; }
+
+/* 加载占位 */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; color: var(--color-text-muted); font-size: var(--font-size-md);
+}
+
+/* 设置分组 */
+.settings-group {
+  display: flex; flex-direction: column; gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+.settings-group:last-of-type { border-bottom: none; }
+.settings-group__title {
+  font-size: 12px; color: var(--color-text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+
+/* 开关(switch) */
+.switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch__slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--color-border); border-radius: 22px;
+  transition: var(--transition);
+}
+.switch__slider::before {
+  content: ""; position: absolute;
+  height: 16px; width: 16px; left: 3px; bottom: 3px;
+  background: white; border-radius: 50%;
+  transition: var(--transition);
+}
+.switch input:checked + .switch__slider { background: var(--color-primary); }
+.switch input:checked + .switch__slider::before { transform: translateX(18px); }
