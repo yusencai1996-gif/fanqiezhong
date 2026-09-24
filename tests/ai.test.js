@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildStudySummary, buildSystemPrompt, buildChatMessages, reduceAiSession, initialAiSession, createAiSession } from '../src/features/ai.js'
+import { buildStudySummary, buildSystemPrompt, buildChatMessages, reduceAiSession, initialAiSession, createAiSession, parseAiMarkdown } from '../src/features/ai.js'
 
 const NOW = new Date(2026, 8, 24, 12)
 const stamp = (day, hour = 9) => new Date(2026, 8, day, hour).toISOString()
@@ -173,5 +173,36 @@ describe('ai: reduceAiSession cancel/reset(v0.5.0 初审阻断修复配套)', ()
     expect(s.messages).toHaveLength(0)
     expect(s.history).toHaveLength(0)
     expect(s.pending).toBeNull()
+  })
+})
+
+describe('ai: parseAiMarkdown 轻量解析(v0.5.2)', () => {
+  it('标题/加粗/行内代码', () => {
+    const blocks = parseAiMarkdown('## 一、今日完成情况\n共 **3 条**，约 `95` 分钟')
+    expect(blocks[0]).toMatchObject({ type: 'heading', level: 2 })
+    expect(blocks[0].spans.some(s => s.text === '一、今日完成情况')).toBe(true)
+    expect(blocks[1].type).toBe('paragraph')
+    expect(blocks[1].spans).toEqual(expect.arrayContaining([
+      { text: '共 ' }, { text: '3 条', bold: true }, { text: '，约 ' }, { text: '95', code: true }, { text: ' 分钟' },
+    ]))
+  })
+  it('无序/有序列表与引用、空行', () => {
+    const blocks = parseAiMarkdown('- 数学 25 分\n1. 先学数学\n> 提示：数据为快照\n\n结尾段')
+    expect(blocks[0].type).toBe('bullet')
+    expect(blocks[1]).toMatchObject({ type: 'ordered', index: '1' })
+    expect(blocks[2].type).toBe('quote')
+    expect(blocks[3].type).toBe('blank')
+    expect(blocks[4].type).toBe('paragraph')
+  })
+  it('无 Markdown 符号的纯文本原样为段落;空输入返回单空行', () => {
+    expect(parseAiMarkdown('你好')[0].type).toBe('paragraph')
+    expect(parseAiMarkdown('')[0].type).toBe('blank')
+    expect(parseAiMarkdown(null)[0].type).toBe('blank')
+  })
+  it('星号不吞文本:乘号原样保留,单星不触发斜体', () => {
+    const spans = parseAiMarkdown('2*3*4 与 5*6')[0].spans
+    const joined = spans.map(s => s.text).join('')
+    expect(joined).toBe('2*3*4 与 5*6')   // 内容不丢
+    expect(spans.some(s => s.italic)).toBe(false)   // v0.5.2:单星不当斜体(防乘号歧义)
   })
 })

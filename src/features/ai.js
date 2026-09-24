@@ -83,6 +83,19 @@ export function buildStudySummary({ sessions = [], plans = [], subjects = [], go
   }
 }
 
+// v0.5.1:摘要数值统一保留 2 位小数——小时数是除法浮点(如 0.5410477761194029),
+// 原样进提示词会被 AI 原样复述,观感差且增加 token(识图审查反馈)。秒数/整数字段不受影响。
+function roundNumbers(value) {
+  if (typeof value === 'number') return Math.round(value * 100) / 100
+  if (Array.isArray(value)) return value.map(roundNumbers)
+  if (value && typeof value === 'object') {
+    const out = {}
+    for (const k of Object.keys(value)) out[k] = roundNumbers(value[k])
+    return out
+  }
+  return value
+}
+
 export function buildSystemPrompt(summary) {
   return [
     '你是只读中文陪学助理，只分析学习情况和提出建议。',
@@ -92,7 +105,7 @@ export function buildSystemPrompt(summary) {
     '近7天包含今天，比较时写清日期范围。计划投入为科目级，同科目多个计划共享，禁止重复求和。',
     '今日复盘按今日完成情况、近期趋势、计划进度点评、明日顺序建议回答；明日参考是预测，不是明日实际数据。',
     '今日安排以 todayPlanSubjects 按科目给顺序，列出相应计划；同科目计划需求不可直接相加。用“先学 X（约 N 分钟），再学 Y……”表达，不安排具体钟点；遵守用户本轮提出的可用时长，数据不足时不编造计划。',
-    '【最新学习数据 JSON】', JSON.stringify(summary),
+    '【最新学习数据 JSON】', JSON.stringify(roundNumbers(summary)),
   ].join('\n')
 }
 
@@ -169,4 +182,38 @@ export function reduceAiSession(state, event) {
   }
   if (event.type === 'cancel') return { ...current, pending: null }
   return current
+}
+
+// v0.5.2:AI 回复的轻量 Markdown 解析(纯函数,供面板渲染)。
+// 只解析安全子集(标题/加粗/斜体/行内代码/无序有序列表/引用/空行),输出行结构数组;
+// 组件用 React 元素渲染,不拼 HTML 字符串,无注入面。不新增依赖。
+export function parseAiMarkdown(text) {
+  const lines = String(text ?? '').split('\n')
+  return lines.map(raw => {
+    const line = raw.replace(/\s+$/, '')
+    const h = line.match(/^(#{1,4})\s+(.*)$/)
+    if (h) return { type: 'heading', level: h[1].length, spans: parseAiInline(h[2]) }
+    if (/^\s*[-*•]\s+/.test(line)) return { type: 'bullet', spans: parseAiInline(line.replace(/^\s*[-*•]\s+/, '')) }
+    const ol = line.match(/^\s*(\d+)[.、)]\s+(.*)$/)
+    if (ol) return { type: 'ordered', index: ol[1], spans: parseAiInline(ol[2]) }
+    if (/^>\s?/.test(line)) return { type: 'quote', spans: parseAiInline(line.replace(/^>\s?/, '')) }
+    if (line === '') return { type: 'blank' }
+    return { type: 'paragraph', spans: parseAiInline(line) }
+  })
+}
+
+function parseAiInline(s) {
+  // **加粗** / `行内代码`(单星斜体不支持:与数学乘号歧义,v0.5.2) → [{ text, bold?, italic?, code? }]
+  const spans = []
+  const re = /(\*\*[^*\n]+\*\*|`[^`\n]+`)/g
+  let last = 0
+  for (const m of s.matchAll(re)) {
+    if (m.index > last) spans.push({ text: s.slice(last, m.index) })
+    const t = m[0]
+    if (t.startsWith('**')) spans.push({ text: t.slice(2, -2), bold: true })
+    else spans.push({ text: t.slice(1, -1), code: true })
+    last = m.index + t.length
+  }
+  if (last < s.length) spans.push({ text: s.slice(last) })
+  return spans.length ? spans : [{ text: '' }]
 }

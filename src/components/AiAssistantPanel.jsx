@@ -5,9 +5,37 @@ import {
   buildChatMessages,
   buildStudySummary,
   initialAiSession,
+  parseAiMarkdown,
   reduceAiSession,
 } from '../features/ai.js'
 import './AiAssistantPanel.css'
+
+// v0.5.2:AI 回复的轻量 Markdown 渲染(解析在 ai.js 纯函数,已单测)。
+// 只映射为 React 元素,不拼 HTML,无注入面。
+function AiMarkdown({ content }) {
+  const blocks = parseAiMarkdown(content)
+  return (
+    <div className="ai-md">
+      {blocks.map((b, i) => {
+        if (b.type === 'blank') return <div key={i} className="ai-md__blank" />
+        if (b.type === 'heading') return <div key={i} className={`ai-md__h ai-md__h--${Math.min(b.level, 3)}`}>{renderSpans(b.spans, i)}</div>
+        if (b.type === 'bullet') return <div key={i} className="ai-md__li"><span className="ai-md__dot" /><span>{renderSpans(b.spans, i)}</span></div>
+        if (b.type === 'ordered') return <div key={i} className="ai-md__li"><span className="ai-md__num">{b.index}.</span><span>{renderSpans(b.spans, i)}</span></div>
+        if (b.type === 'quote') return <div key={i} className="ai-md__quote">{renderSpans(b.spans, i)}</div>
+        return <div key={i} className="ai-md__p">{renderSpans(b.spans, i)}</div>
+      })}
+    </div>
+  )
+}
+
+function renderSpans(spans, keyBase) {
+  return spans.map((s, j) => {
+    if (s.bold) return <strong key={`${keyBase}-${j}`}>{s.text}</strong>
+    if (s.italic) return <em key={`${keyBase}-${j}`}>{s.text}</em>
+    if (s.code) return <code key={`${keyBase}-${j}`}>{s.text}</code>
+    return <span key={`${keyBase}-${j}`}>{s.text}</span>
+  })
+}
 
 // 错误码 → 固定中文文案(PLAN 第四节错误表;不透传 API 原文)
 // AiSettingsSection 的连接测试也复用这份映射
@@ -173,7 +201,9 @@ export default function AiAssistantPanel({ open, config, getStudyData, onClose }
             <div key={i} className={`ai-msg ai-msg--${m.role}`}>
               <span className="ai-msg__avatar">{m.role === 'user' ? <User size={14} /> : <Bot size={14} />}</span>
               <div className="ai-msg__body">
-                <div className="ai-msg__content">{m.content}</div>
+                {m.role === 'assistant'
+                  ? <AiMarkdown content={m.content} />
+                  : <div className="ai-msg__content">{m.content}</div>}
               </div>
             </div>
           ))}
