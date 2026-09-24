@@ -113,6 +113,38 @@ export default function App() {
     if (api?.aiCancel && aiTestReqRef.current) api.aiCancel({ requestId: aiTestReqRef.current })
   }
 
+  // v0.6.0 引导式建档:应用 AI 方案。按 validatePlanAgainstStore 生成的操作序列
+  // 逐个调 store API(只新建,不改不删),用返回的 id 串 goal→subject→plan 依赖。
+  // store 无事务:中途失败不回滚,返回错误供面板提示用户检查(失败概率极低)。
+  function applyPlanProposal(ops) {
+    const goalIdsByName = new Map()
+    const subjectIdsByName = new Map()
+    const created = { goal: null, subjects: [], plans: [] }
+    try {
+      for (const op of Array.isArray(ops) ? ops : []) {
+        if (op.op === 'addGoal') {
+          const goal = store.addGoal({ name: op.name, deadline: op.deadline })
+          goalIdsByName.set(op.name, goal.id)
+          created.goal = goal
+        } else if (op.op === 'addSubject') {
+          const goalId = goalIdsByName.get(op.goalName)
+          if (!goalId) throw new Error(`找不到目标「${op.goalName}」`)
+          const subject = store.addSubject({ goalId, name: op.name })
+          subjectIdsByName.set(op.name, subject.id)
+          created.subjects.push(subject)
+        } else if (op.op === 'addPlan') {
+          const subjectId = subjectIdsByName.get(op.subjectName)
+          if (!subjectId) throw new Error(`找不到科目「${op.subjectName}」`)
+          created.plans.push(store.addPlan({ subjectId, name: op.name, totalHours: op.totalHours, deadline: op.deadline }))
+        }
+      }
+      if (!created.goal) return { ok: false, error: '操作序列里没有目标' }
+      return { ok: true, created }
+    } catch (e) {
+      return { ok: false, error: e?.message || '写入失败' }
+    }
+  }
+
   useEffect(() => {
     const unsub = store.subscribe(s => {
       setState(s)
@@ -452,6 +484,7 @@ export default function App() {
             subjects: state.subjects,
             goals: state.goals,
           })}
+          onApplyPlan={applyPlanProposal}
           onClose={() => setAiOpen(false)}
         />
       )}

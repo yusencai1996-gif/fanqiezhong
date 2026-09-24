@@ -230,3 +230,41 @@
 .ai-md__num { flex: none; min-width: 1.4em; color: var(--color-text-muted, inherit); }
 .ai-md__quote { border-left: 3px solid var(--color-border, #ddd); padding: 2px 0 2px 9px; color: var(--color-text-muted, inherit); }
 .ai-md code { font-family: var(--font-mono, Consolas, monospace); font-size: 0.92em; background: var(--color-bg-soft, rgba(127,127,127,.12)); border-radius: 4px; padding: 1px 5px; }
+
+/* ===== v0.6.0 方案预览卡(ai-plan)+ 系统提示气泡(ai-note):只消费现有主题 token ===== */
+.ai-note {
+  text-align: center; font-size: 12px; letter-spacing: 0;
+  color: var(--color-text-muted); padding: 2px 0;
+}
+.ai-plan {
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-bg); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 12px; letter-spacing: 0; line-height: 1.7;
+}
+.ai-plan__title { font-weight: 700; color: var(--color-primary); }
+.ai-plan__row { display: flex; gap: 8px; }
+.ai-plan__label { flex: none; color: var(--color-text-muted); }
+.ai-plan__plans { display: flex; flex-direction: column; gap: 4px; }
+.ai-plan__subject-name { font-weight: 500; }
+.ai-plan__warn { color: var(--color-danger); }
+.ai-plan__error { color: var(--color-danger); }
+.ai-plan__done {
+  align-self: flex-start; color: var(--color-success);
+  border: 1px solid currentColor; border-radius: var(--radius-pill); padding: 2px 10px;
+}
+.ai-plan__actions { display: flex; gap: var(--space-sm); margin-top: 2px; }
+.ai-plan__apply {
+  background: var(--color-primary); border: 1px solid var(--color-primary); color: white;
+  border-radius: var(--radius-pill); padding: 4px 14px;
+  font-size: 12px; letter-spacing: 0; font-family: var(--font-family);
+  cursor: pointer; transition: var(--transition);
+}
+.ai-plan__apply:hover { background: var(--color-primary-hover); }
+.ai-plan__adjust {
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 4px 14px;
+  font-size: 12px; letter-spacing: 0; font-family: var(--font-family);
+  cursor: pointer; transition: var(--transition);
+}
+.ai-plan__adjust:hover { color: var(--color-primary); border-color: var(--color-primary); }

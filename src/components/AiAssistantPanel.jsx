@@ -6,7 +6,9 @@ import {
   buildStudySummary,
   initialAiSession,
   parseAiMarkdown,
+  parsePlanProposal,
   reduceAiSession,
+  validatePlanAgainstStore,
 } from '../features/ai.js'
 import './AiAssistantPanel.css'
 
@@ -80,11 +82,64 @@ function makeRequestId() {
   return 'req-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
 }
 
+// v0.6.0 方案预览卡(ai-plan 命名空间)。纯展示 + 两个动作,数据来自 parsePlanProposal 校验过的 proposal。
+// applied 后按钮消失;applyError 保留卡片供重试/调整。
+function PlanProposalCard({ proposal, warnings, cardState, onApply, onAdjust }) {
+  const plansBySubject = new Map(proposal.subjects.map(s => [s.name, []]))
+  for (const p of proposal.plans) plansBySubject.get(p.subjectName)?.push(p)
+  return (
+    <div className="ai-plan">
+      <div className="ai-plan__title">方案预览</div>
+      <div className="ai-plan__row">
+        <span className="ai-plan__label">目标</span>
+        <span>{proposal.goal.name}(截止 {proposal.goal.deadline})</span>
+      </div>
+      <div className="ai-plan__row">
+        <span className="ai-plan__label">科目</span>
+        <span>{proposal.subjects.map(s => s.name).join('、') || '无'}</span>
+      </div>
+      {proposal.plans.length > 0 && (
+        <div className="ai-plan__plans">
+          {proposal.subjects.map(s => {
+            const list = plansBySubject.get(s.name) || []
+            if (!list.length) return null
+            return (
+              <div key={s.name} className="ai-plan__subject">
+                <div className="ai-plan__subject-name">{s.name}</div>
+                {list.map((p, i) => (
+                  <div key={i} className="ai-md__li">
+                    <span className="ai-md__dot" />
+                    <span>{p.name} · {p.totalHours} 小时 · 截止 {p.deadline}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {warnings.map((w, i) => <div key={i} className="ai-plan__warn">{w}</div>)}
+      {cardState?.applied ? (
+        <div className="ai-plan__done">已应用</div>
+      ) : (
+        <>
+          {cardState?.error && <div className="ai-plan__error" role="alert">{cardState.error}</div>}
+          <div className="ai-plan__actions">
+            <button className="ai-plan__apply" onClick={onApply}>应用方案</button>
+            <button className="ai-plan__adjust" onClick={onAdjust}>继续调整</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // AI 陪学助理面板。已配置期间保持挂载(open=false 不渲染弹层),
 // 关闭再开会话历史保留;清除密钥后 App 卸载本组件,内存随之清空。
-export default function AiAssistantPanel({ open, config, getStudyData, onClose }) {
+export default function AiAssistantPanel({ open, config, getStudyData, onApplyPlan, onClose }) {
   const [session, dispatch] = useReducer(reduceAiSession, initialAiSession)
   const [draft, setDraft] = useState('')
+  // v0.6.0:预览卡状态,按消息下标归档(history 只增不减,下标稳定)。{ applied?: true, error?: string }
+  const [planCards, setPlanCards] = useState({})
   const listRef = useRef(null)
   const stickBottomRef = useRef(true)   // 用户是否贴底(贴底或自己发送时才跟随滚动)
   const inputRef = useRef(null)
@@ -165,6 +220,32 @@ export default function AiAssistantPanel({ open, config, getStudyData, onClose }
     }
   }
 
+  // v0.6.0 应用方案:先按最新数据预检生成操作序列,再交给 App 调 store 写入(只新建)。
+  // 成功:卡片变已应用态 + 气泡区追加系统提示;失败:错误留在卡片上,不丢方案。
+  function handleApplyPlan(msgIndex, proposal) {
+    const check = validatePlanAgainstStore(proposal, getStudyData())
+    if (!check.ok) {
+      setPlanCards(s => ({ ...s, [msgIndex]: { error: '方案校验未通过,请点「继续调整」让 AI 重新生成' } }))
+      return
+    }
+    let res
+    try {
+      res = onApplyPlan ? onApplyPlan(check.ops) : { ok: false, error: '当前环境不支持写入' }
+    } catch {
+      res = { ok: false, error: '写入失败,请检查数据后重试' }
+    }
+    if (res?.ok) {
+      setPlanCards(s => ({ ...s, [msgIndex]: { applied: true } }))
+      dispatch({ type: 'note', content: `方案已创建:目标「${proposal.goal.name}」、${proposal.subjects.length} 个科目、${proposal.plans.length} 个计划` })
+    } else {
+      setPlanCards(s => ({ ...s, [msgIndex]: { error: `应用失败:${res?.error || '未知错误'}。已创建的内容不会自动回滚,请到「目标与科目」检查` } }))
+    }
+  }
+
+  function handleAdjustPlan() {
+    inputRef.current?.focus()
+  }
+
   if (!open) return null
 
   const empty = session.history.length === 0
@@ -187,6 +268,9 @@ export default function AiAssistantPanel({ open, config, getStudyData, onClose }
           <button className="ai-quick__btn" disabled={pending} onClick={() => send('今日学习顺序建议', 'order')}>
             今日学习顺序建议
           </button>
+          <button className="ai-quick__btn" disabled={pending} onClick={() => send('开始规划', 'plan')}>
+            开始规划
+          </button>
         </div>
 
         <div className="ai-messages" ref={listRef} onScroll={handleScroll}>
@@ -197,16 +281,35 @@ export default function AiAssistantPanel({ open, config, getStudyData, onClose }
               <p className="ai-empty__desc">基于你的真实专注记录和计划回答问题、做今日复盘、排今日学习顺序。只读建议,不会改动你的任何数据。</p>
             </div>
           )}
-          {session.history.map((m, i) => (
-            <div key={i} className={`ai-msg ai-msg--${m.role}`}>
-              <span className="ai-msg__avatar">{m.role === 'user' ? <User size={14} /> : <Bot size={14} />}</span>
-              <div className="ai-msg__body">
-                {m.role === 'assistant'
-                  ? <AiMarkdown content={m.content} />
-                  : <div className="ai-msg__content">{m.content}</div>}
+          {session.history.map((m, i) => {
+            // v0.6.0 系统提示(如"方案已创建"):居中细字,无头像气泡
+            if (m.role === 'system') return <div key={i} className="ai-note">{m.content}</div>
+            // v0.6.0 每条 assistant 回复跑一次方案提取:成功→正文(去掉标记块)+预览卡;失败→原样 Markdown(降级不报错)
+            const parsed = m.role === 'assistant' ? parsePlanProposal(m.content) : null
+            const proposal = parsed?.ok ? parsed.proposal : null
+            const cardState = planCards[i]
+            // 警告在应用前按最新数据实时算(重名目标等);已应用/已出错的卡片不再重复提示
+            const warnings = proposal && !cardState ? validatePlanAgainstStore(proposal, getStudyData()).warnings : []
+            return (
+              <div key={i} className={`ai-msg ai-msg--${m.role}`}>
+                <span className="ai-msg__avatar">{m.role === 'user' ? <User size={14} /> : <Bot size={14} />}</span>
+                <div className="ai-msg__body">
+                  {m.role === 'assistant'
+                    ? <AiMarkdown content={proposal ? parsed.rest : m.content} />
+                    : <div className="ai-msg__content">{m.content}</div>}
+                  {proposal && (
+                    <PlanProposalCard
+                      proposal={proposal}
+                      warnings={warnings}
+                      cardState={cardState}
+                      onApply={() => handleApplyPlan(i, proposal)}
+                      onAdjust={handleAdjustPlan}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           {pending && (
             <div className="ai-msg ai-msg--assistant">
               <span className="ai-msg__avatar"><Bot size={14} /></span>
