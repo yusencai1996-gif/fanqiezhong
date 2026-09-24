@@ -5,8 +5,8 @@ import { aiErrorText } from './AiAssistantPanel.jsx'
 import './AiAssistantPanel.css'
 
 const MODELS = [
-  { value: 'deepseek-chat', label: 'deepseek-chat' },
-  { value: 'deepseek-reasoner', label: 'deepseek-reasoner' },
+  { value: 'deepseek-flash', label: 'deepseek-flash' },
+  { value: 'deepseek-v4-pro', label: 'deepseek-v4-pro' },
 ]
 
 // 设置面板「AI 助手」区(F1)。

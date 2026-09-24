@@ -113,7 +113,7 @@ const migrations = [
         aiConfig: {
           ...aiConfig,
           apiKey: typeof aiConfig.apiKey === 'string' ? aiConfig.apiKey : '',
-          model: ['deepseek-chat', 'deepseek-reasoner'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-chat',
+          model: ['deepseek-flash', 'deepseek-v4-pro'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-flash',
         },
       },
     }
@@ -132,7 +132,7 @@ export function migrateState(input) {
   const aiConfig = settings.aiConfig && typeof settings.aiConfig === 'object' && !Array.isArray(settings.aiConfig) ? settings.aiConfig : {}
   return {
     ...st,
-    settings: { ...settings, aiConfig: { ...aiConfig, apiKey: typeof aiConfig.apiKey === 'string' ? aiConfig.apiKey : '', model: ['deepseek-chat', 'deepseek-reasoner'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-chat' } },
+    settings: { ...settings, aiConfig: { ...aiConfig, apiKey: typeof aiConfig.apiKey === 'string' ? aiConfig.apiKey : '', model: ['deepseek-flash', 'deepseek-v4-pro'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-flash' } },
     schemaVersion: CURRENT_SCHEMA_VERSION,
   }
 }
@@ -183,7 +183,7 @@ export function createMemoryStore(initialState) {
       autoStartBreak: false,
       autoStartWork: false,
       dailyGoalMinutes: 30,   // v0.3.8:打卡表每日专注门槛(分钟),达标=打卡成功
-      aiConfig: { apiKey: '', model: 'deepseek-chat' },
+      aiConfig: { apiKey: '', model: 'deepseek-flash' },
     },
     goals: [],       // v0.3.0:目标(如"考研")
     subjects: [],    // v0.3.0:科目(如"数学"),归属 goal

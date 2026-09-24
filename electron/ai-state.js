@@ -1,5 +1,5 @@
-const MODELS = new Set(['deepseek-chat', 'deepseek-reasoner'])
-const DEFAULT_MODEL = 'deepseek-chat'
+const MODELS = new Set(['deepseek-flash', 'deepseek-v4-pro'])
+const DEFAULT_MODEL = 'deepseek-flash'
 
 function configFrom(state) {
   const raw = state?.settings?.aiConfig

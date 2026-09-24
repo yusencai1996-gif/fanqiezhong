@@ -6,12 +6,12 @@ const KEY = 'sk-test-12345678'
 const messages = [{ role: 'system', content: '事实' }, { role: 'user', content: '你好' }]
 const okBody = (content = '回答', extras = {}) => ({ choices: [{ finish_reason: 'stop', message: { content, ...extras } }] })
 const response = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body) })
-const setup = (fetchImpl, config = { apiKey: KEY, model: 'deepseek-chat' }, options = {}) => createAiService({ fetchImpl, getPrivateConfig: () => config, ...options })
+const setup = (fetchImpl, config = { apiKey: KEY, model: 'deepseek-flash' }, options = {}) => createAiService({ fetchImpl, getPrivateConfig: () => config, ...options })
 
 afterEach(() => vi.useRealTimers())
 
 describe('DeepSeek AI service', () => {
-  it.each(['deepseek-chat', 'deepseek-reasoner'])('sends %s to the fixed endpoint with only required fields', async model => {
+  it.each(['deepseek-flash', 'deepseek-v4-pro'])('sends %s to the fixed endpoint with only required fields', async model => {
     const fetchImpl = vi.fn(async () => response(200, okBody()))
     const result = await setup(fetchImpl, { apiKey: KEY, model }).chat({ requestId: 'one', messages })
     expect(result).toEqual({ ok: true, data: { requestId: 'one', content: '回答', model } })
@@ -25,19 +25,19 @@ describe('DeepSeek AI service', () => {
   it('sends a minimal connection test without study data', async () => {
     const fetchImpl = vi.fn(async () => response(200, okBody()))
     const result = await setup(fetchImpl).testConnection({ requestId: 'test' })
-    expect(result.data).toEqual({ requestId: 'test', model: 'deepseek-chat' })
+    expect(result.data).toEqual({ requestId: 'test', model: 'deepseek-flash' })
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body).messages).toEqual([{ role: 'user', content: '请只回复“连接成功”。' }])
   })
 
   it('makes zero network requests without a key', async () => {
     const fetchImpl = vi.fn()
-    expect((await setup(fetchImpl, { apiKey: '', model: 'deepseek-chat' }).chat({ requestId: 'x', messages })).error.code).toBe('NOT_CONFIGURED')
+    expect((await setup(fetchImpl, { apiKey: '', model: 'deepseek-flash' }).chat({ requestId: 'x', messages })).error.code).toBe('NOT_CONFIGURED')
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('uses only final content from reasoner and rejects reasoning-only output', async () => {
     const fetchImpl = vi.fn(async () => response(200, okBody('最终答案', { reasoning_content: '私有推理' })))
-    const service = setup(fetchImpl, { apiKey: KEY, model: 'deepseek-reasoner' })
+    const service = setup(fetchImpl, { apiKey: KEY, model: 'deepseek-v4-pro' })
     const result = await service.chat({ requestId: 'x', messages })
     expect(JSON.stringify(result)).not.toContain('私有推理')
     expect(result.data.content).toBe('最终答案')

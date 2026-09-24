@@ -12,12 +12,12 @@ function setup() {
   const win = { webContents, isDestroyed: () => false }
   const event = { sender: webContents, senderFrame: mainFrame }
   const gateway = {
-    getPublicAiConfig: vi.fn(() => ({ hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-chat' })),
-    updateAiConfig: vi.fn(() => ({ ok: true, data: { hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-chat' } })),
+    getPublicAiConfig: vi.fn(() => ({ hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-flash' })),
+    updateAiConfig: vi.fn(() => ({ ok: true, data: { hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-flash' } })),
   }
   const service = {
-    chat: vi.fn(async input => ({ ok: true, data: { requestId: input.requestId, content: '回答', model: 'deepseek-chat' } })),
-    testConnection: vi.fn(async input => ({ ok: true, data: { requestId: input.requestId, model: 'deepseek-chat' } })),
+    chat: vi.fn(async input => ({ ok: true, data: { requestId: input.requestId, content: '回答', model: 'deepseek-flash' } })),
+    testConnection: vi.fn(async input => ({ ok: true, data: { requestId: input.requestId, model: 'deepseek-flash' } })),
     cancel: vi.fn(() => true), cancelAll: vi.fn(),
   }
   const dispose = registerAiHandlers({ ipcMain, getMainWindow: () => win, gateway, service })
@@ -28,7 +28,7 @@ function setup() {
 describe('AI IPC boundary', () => {
   it('allows the main frame and returns the public config only', async () => {
     const f = setup()
-    expect(await f.call('aiGetConfig')).toEqual({ ok: true, data: { hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-chat' } })
+    expect(await f.call('aiGetConfig')).toEqual({ ok: true, data: { hasApiKey: true, maskedApiKey: '••••5678', model: 'deepseek-flash' } })
     expect((await f.call('aiChat', f.event, { requestId: 'one', messages })).data.content).toBe('回答')
   })
 
@@ -68,7 +68,7 @@ describe('AI IPC boundary', () => {
     expect((await f.call('aiCancel', f.event, { requestId: 'other' })).data.cancelled).toBe(false)
     expect((await f.call('aiCancel', f.event, { requestId: 'one' })).data.cancelled).toBe(true)
     expect((await f.call('aiChat', f.event, { requestId: 'two', messages })).error.code).toBe('BUSY')
-    await f.call('aiUpdateConfig', f.event, { model: 'deepseek-reasoner' })
+    await f.call('aiUpdateConfig', f.event, { model: 'deepseek-v4-pro' })
     expect(f.service.cancelAll).toHaveBeenCalled()
     complete({ ok: false, error: { code: 'CANCELLED', message: '请求已取消。', retryable: false } })
     await pending
