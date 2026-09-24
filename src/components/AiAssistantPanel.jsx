@@ -1,13 +1,17 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { Bot, RotateCcw, Send, Sparkles, User } from 'lucide-react'
 // 冻结契约(PLAN 第四节):会话纯函数与消息编排来自 src/features/ai.js。
+// v0.7.0:parsePlanAdjustment/validatePlanAdjustment 为第三期「智能调计划」冻结签名(PLAN 第三节)。
 import {
   buildChatMessages,
   buildStudySummary,
   initialAiSession,
   parseAiMarkdown,
+  parsePlanAdjustment,
   parsePlanProposal,
   reduceAiSession,
+  sameAdjustmentIdentity,
+  validatePlanAdjustment,
   validatePlanAgainstStore,
 } from '../features/ai.js'
 import './AiAssistantPanel.css'
@@ -133,13 +137,116 @@ function PlanProposalCard({ proposal, warnings, cardState, onApply, onAdjust }) 
   )
 }
 
+// ===== v0.7.0 调整预览卡(ai-adjust 命名空间) =====
+// 标题「调整预览」,区别于二期「方案预览」。before/after 只展示 validatePlanAdjustment
+// 应用侧生成的 previews 快照(真实前值来自 store),不信 AI 文本里的任何"前值"。
+const ADJUST_FIELDS = [
+  ['name', '名称'],
+  ['totalHours', '总时长'],
+  ['deadline', '截止日'],
+]
+
+// 精确值直出(PLAN 第六节:不过度格式化掩盖小数修改);空截止日显示「无」
+function adjustFieldText(field, v) {
+  if (v === null || v === undefined || v === '') return '无'
+  if (field === 'totalHours') return `${v} 小时`
+  return String(v)
+}
+
+// 校验错误/警告条目归一化为文案(后端 errors 可能是字符串或 { changeIndex, code, message })
+function adjustIssueText(e) {
+  if (typeof e === 'string') return e
+  const msg = e?.message || e?.error || '未通过校验'
+  return Number.isInteger(e?.changeIndex) ? `第 ${e.changeIndex + 1} 条:${msg}` : msg
+}
+
+// 状态机(PLAN 第六节):ready 可应用 / invalid 不可应用(有 errors)/ applying 提交中 /
+// applied 已应用 / stale 已过期(STALE_PREVIEW)/ error 失败 / superseded 已被新方案替代(失效)。
+// 按钮禁用:请求中(busy)、提交中、已应用、校验不通过时禁用「应用调整」;提交中禁用「继续调整」。
+function PlanAdjustmentCard({ previews, errors, warnings, cardState, busy, onApply, onAdjust, onRefresh }) {
+  const status = cardState?.status || 'ready'
+  return (
+    <div className="ai-adjust">
+      <div className="ai-adjust__title">调整预览</div>
+      <div className="ai-adjust__changes">
+        {previews.map((p) => (
+          <div key={p.changeIndex} className="ai-adjust__change">
+            <div className="ai-adjust__plan">{p.subjectName} · {p.planName}</div>
+            {ADJUST_FIELDS.map(([f, label]) => {
+              const changed = Array.isArray(p.changedFields) && p.changedFields.includes(f)
+              return (
+                <div key={f} className={`ai-adjust__field${changed ? '' : ' ai-adjust__field--same'}`}>
+                  <span className="ai-adjust__label">{label}</span>
+                  {changed ? (
+                    <span>
+                      {adjustFieldText(f, p.before?.[f])}
+                      <span className="ai-adjust__arrow"> → </span>
+                      <strong>{adjustFieldText(f, p.after?.[f])}</strong>
+                    </span>
+                  ) : (
+                    <span>不变</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      {warnings.map((w, i) => <div key={i} className="ai-adjust__warn">{adjustIssueText(w)}</div>)}
+      {status === 'invalid' && errors.map((e, i) => <div key={i} className="ai-adjust__error">{adjustIssueText(e)}</div>)}
+      {status === 'applied' ? (
+        <div className="ai-adjust__done">已应用</div>
+      ) : status === 'superseded' ? (
+        <div className="ai-adjust__stale">已有更新的调整方案,此卡失效</div>
+      ) : status === 'stale' ? (
+        <>
+          <div className="ai-adjust__stale" role="alert">
+            {cardState?.error || '预览已过期:确认前相关数据已变化,本次未写入。'}
+          </div>
+          <div className="ai-adjust__actions">
+            <button className="ai-adjust__apply" disabled={busy} onClick={onRefresh}>重新查看</button>
+            <button className="ai-adjust__continue" onClick={onAdjust}>继续调整</button>
+          </div>
+        </>
+      ) : (
+        <>
+          {status === 'invalid' && (
+            <div className="ai-adjust__hint">方案未通过校验,无法应用;可点「继续调整」让 AI 修正后重新生成</div>
+          )}
+          {status === 'error' && (
+            <div className="ai-adjust__error" role="alert">应用失败:{cardState?.error || '未知错误'}</div>
+          )}
+          <div className="ai-adjust__actions">
+            <button
+              className="ai-adjust__apply"
+              disabled={busy || status === 'applying' || status === 'invalid'}
+              onClick={onApply}
+            >
+              {status === 'applying' ? '应用中…' : '应用调整'}
+            </button>
+            <button className="ai-adjust__continue" disabled={status === 'applying'} onClick={onAdjust}>
+              继续调整
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // AI 陪学助理面板。已配置期间保持挂载(open=false 不渲染弹层),
 // 关闭再开会话历史保留;清除密钥后 App 卸载本组件,内存随之清空。
-export default function AiAssistantPanel({ open, config, getStudyData, onApplyPlan, onClose }) {
+export default function AiAssistantPanel({ open, config, getStudyData, onApplyPlan, onApplyAdjustment, onClose }) {
   const [session, dispatch] = useReducer(reduceAiSession, initialAiSession)
   const [draft, setDraft] = useState('')
+  const activeModeRef = useRef('chat')   // v0.7.0:plan/adjust 会话的续聊模式延续
   // v0.6.0:预览卡状态,按消息下标归档(history 只增不减,下标稳定)。{ applied?: true, error?: string }
   const [planCards, setPlanCards] = useState({})
+  // v0.7.0:调整卡按消息下标归档。{ adjustment, previews, errors, warnings, status, error? }
+  // previews 是校验通过时的快照(确认时前后对照),已应用后保留不随 store 重算(PLAN 第六节)。
+  const [adjustCards, setAdjustCards] = useState({})
+  const adjustSeenRef = useRef(new Set())    // 已做过到达时校验的消息下标(每条 assistant 回复只校验一次)
+  const adjustApplyingRef = useRef(false)    // 同步 ref 防快速双击(PLAN 第六节)
   const listRef = useRef(null)
   const stickBottomRef = useRef(true)   // 用户是否贴底(贴底或自己发送时才跟随滚动)
   const inputRef = useRef(null)
@@ -157,18 +264,44 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
     if (open) inputRef.current?.focus()
   }, [open])
 
-  // 滚动跟随:仅贴底时跟随新内容;用户上翻阅读历史不强制滚底
+  // 滚动跟随:仅贴底时跟随新内容;用户上翻阅读历史不强制滚底。
+  // adjustCards 入依赖:回复文本先到位、调整卡校验后(晚一拍)增高,贴底时同样跟到底。
   useEffect(() => {
     if (!open) return
     const el = listRef.current
     if (el && stickBottomRef.current) el.scrollTop = el.scrollHeight
-  }, [session.history, session.pending, session.error, open])
+  }, [session.history, session.pending, session.error, adjustCards, open])
 
   function handleScroll() {
     const el = listRef.current
     if (!el) return
     stickBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
+
+  // v0.7.0:assistant 回复到达后做一次调整校验,快照(previews/errors/warnings)固化进卡片。
+  // 之后 store 变化不在卡片层重算 before/after——过期交由 App 应用前复检(STALE_PREVIEW)判定。
+  // StrictMode 双跑/重渲染幂等:adjustSeenRef + setState 守卫,每条消息只入册一次。
+  useEffect(() => {
+    session.history.forEach((m, i) => {
+      if (m.role !== 'assistant' || adjustSeenRef.current.has(i)) return
+      const parsed = parsePlanAdjustment(m.content)
+      if (!parsed?.ok) return
+      adjustSeenRef.current.add(i)
+      const v = validatePlanAdjustment(parsed.adjustment, getStudyData())
+      const previews = Array.isArray(v?.previews) ? v.previews : []
+      const errors = Array.isArray(v?.errors) ? v.errors : []
+      const warnings = Array.isArray(v?.warnings) ? v.warnings : []
+      setAdjustCards(s => (s[i] ? s : {
+        ...s,
+        [i]: {
+          adjustment: parsed.adjustment,
+          previews, errors, warnings,
+          // 整批预检不过(ok:false)或无实际写操作(ops 空)→ 不可应用
+          status: v?.ok && Array.isArray(v.ops) && v.ops.length ? 'ready' : 'invalid',
+        },
+      }))
+    })
+  }, [session.history, getStudyData])
 
   const pending = !!session.pending
 
@@ -178,6 +311,8 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
     const api = window.pomodoroAPI
     if (!api?.aiChat || session.pending) return
     if (mode === 'chat' && !text.trim()) return
+    // v0.7.0 复审 S1 整改:续聊模式延续——plan/adjust 会话中输入框消息沿用该模式(协议上下文不丢)
+    activeModeRef.current = (mode === 'plan' || mode === 'adjust') ? mode : 'chat'
     const requestId = makeRequestId()
     // reduceAiSession 的 start:防重复点击;重试(同 text+mode 的 error 在册)不重复追加 user 消息
     dispatch({ type: 'start', requestId, text, mode })
@@ -209,7 +344,9 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
     const text = draft.trim()
     if (!text || pending) return
     setDraft('')
-    send(text, 'chat')
+    // v0.7.0 复审 S1 整改:plan/adjust 会话中,输入框续聊沿用当前模式(保住建档/调整协议上下文);
+    // review/order 是一次性完整提问,发完自动回普通对话
+    send(text, activeModeRef.current)
   }
 
   function handleInputKeyDown(e) {
@@ -246,9 +383,73 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
     inputRef.current?.focus()
   }
 
+  // v0.7.0 应用调整:把卡片确认时快照(previews)作为 expectedPreview 交给 App 复检;
+  // App 内部重新取 store 最新状态、白名单重建 patch、同步 ref 防双击(这里面板侧再加一道)。
+  // 结果映射状态机:ok→已应用+系统提示;STALE_PREVIEW→已过期(零写入,可「重新查看」);其余→失败保留卡片。
+  async function handleApplyAdjustment(msgIndex) {
+    const card = adjustCards[msgIndex]
+    if (!card || (card.status !== 'ready' && card.status !== 'error')) return
+    if (pending || adjustApplyingRef.current) return
+    adjustApplyingRef.current = true
+    setAdjustCards(s => ({ ...s, [msgIndex]: { ...s[msgIndex], status: 'applying', error: null } }))
+    let res
+    try {
+      res = onApplyAdjustment
+        ? await onApplyAdjustment({ adjustment: card.adjustment, expectedPreview: card.previews })
+        : { ok: false, code: 'NOT_READY', error: '当前环境不支持写入' }
+    } catch {
+      res = { ok: false, code: 'APPLY_FAILED', error: '写入失败,请检查数据后重试' }
+    } finally {
+      adjustApplyingRef.current = false
+    }
+    if (res?.ok) {
+      setAdjustCards(s => ({ ...s, [msgIndex]: { ...s[msgIndex], status: 'applied' } }))
+      const names = card.previews.map(p => `${p.subjectName}·${p.after?.name ?? p.planName}`).join('、')
+      dispatch({ type: 'note', content: `调整已应用:${names || `${card.previews.length} 个计划`}` })
+    } else if (res?.code === 'STALE_PREVIEW') {
+      setAdjustCards(s => ({ ...s, [msgIndex]: { ...s[msgIndex], status: 'stale', error: res.error || '预览已过期,本次未写入' } }))
+    } else {
+      setAdjustCards(s => ({ ...s, [msgIndex]: { ...s[msgIndex], status: 'error', error: res?.error || '未知错误' } }))
+    }
+  }
+
+  // 过期卡「重新查看」:按最新数据重新校验并刷新快照,用户再次确认后才可应用(PLAN 第六节)
+  // v0.7.0 复审 B1 整改:身份锚——原计划被删除/替换成同名新计划时,拒绝刷新(不换绑),要求重新生成方案
+  function handleRefreshAdjustment(msgIndex) {
+    const card = adjustCards[msgIndex]
+    if (!card) return
+    const v = validatePlanAdjustment(card.adjustment, getStudyData())
+    const previews = Array.isArray(v?.previews) ? v.previews : []
+    if (!sameAdjustmentIdentity(card.previews, previews)) {
+      setAdjustCards(s => ({
+        ...s,
+        [msgIndex]: { ...s[msgIndex], status: 'stale', error: '原计划已被删除或替换,本方案不再有效;请让 AI 重新生成调整方案' },
+      }))
+      return
+    }
+    const errors = Array.isArray(v?.errors) ? v.errors : []
+    const warnings = Array.isArray(v?.warnings) ? v.warnings : []
+    setAdjustCards(s => ({
+      ...s,
+      [msgIndex]: {
+        ...s[msgIndex], previews, errors, warnings, error: null,
+        status: v?.ok && Array.isArray(v.ops) && v.ops.length ? 'ready' : 'invalid',
+      },
+    }))
+  }
+
   if (!open) return null
 
   const empty = session.history.length === 0
+  // v0.7.0:最新一条**可应用**调整方案的下标。替代方案出现后,旧卡(未应用)标记失效防误点(PLAN 第六节)。
+  // 初审整改:解析成功但校验不过(invalid)的卡不参与顶替——否则新卡点不动还把旧可用卡锁死,两张卡成死点
+  let latestAdjustIdx = -1
+  session.history.forEach((m, i) => {
+    if (m.role === 'assistant' && parsePlanAdjustment(m.content)?.ok
+      && !(adjustCards[i] && Array.isArray(adjustCards[i].errors) && adjustCards[i].errors.length)) {
+      latestAdjustIdx = i
+    }
+  })
 
   return (
     <div className="ai-overlay" onClick={onClose}>
@@ -271,6 +472,10 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
           <button className="ai-quick__btn" disabled={pending} onClick={() => send('开始规划', 'plan')}>
             开始规划
           </button>
+          {/* v0.7.0:计划体检(mode='adjust',默认问题由 buildChatMessages 按 PLAN 第四节展开) */}
+          <button className="ai-quick__btn" disabled={pending} onClick={() => send('计划体检', 'adjust')}>
+            计划体检
+          </button>
         </div>
 
         <div className="ai-messages" ref={listRef} onScroll={handleScroll}>
@@ -284,19 +489,44 @@ export default function AiAssistantPanel({ open, config, getStudyData, onApplyPl
           {session.history.map((m, i) => {
             // v0.6.0 系统提示(如"方案已创建"):居中细字,无头像气泡
             if (m.role === 'system') return <div key={i} className="ai-note">{m.content}</div>
-            // v0.6.0 每条 assistant 回复跑一次方案提取:成功→正文(去掉标记块)+预览卡;失败→原样 Markdown(降级不报错)
-            const parsed = m.role === 'assistant' ? parsePlanProposal(m.content) : null
+            // v0.7.0 每条 assistant 回复先跑调整协议提取:成功→正文(去标记块)+调整预览卡。
+            // 含 plan-adjust 块但解析失败(坏 JSON/多块/混合块)→ 完整降级普通文本,不出任何卡(PLAN 第四节)
+            const adjParsed = m.role === 'assistant' ? parsePlanAdjustment(m.content) : null
+            const adjOk = !!adjParsed?.ok
+            const adjCard = adjustCards[i]
+            const hasAdjustBlock = m.role === 'assistant' && !adjOk && typeof m.content === 'string' && m.content.includes('```plan-adjust')
+            // v0.6.0 方案提取(与调整协议互斥:同一条回复只可能出一种卡)
+            const parsed = (m.role === 'assistant' && !adjOk && !hasAdjustBlock) ? parsePlanProposal(m.content) : null
             const proposal = parsed?.ok ? parsed.proposal : null
             const cardState = planCards[i]
             // 警告在应用前按最新数据实时算(重名目标等);已应用/已出错的卡片不再重复提示
             const warnings = proposal && !cardState ? validatePlanAgainstStore(proposal, getStudyData()).warnings : []
+            // 替代方案出现后旧卡失效;已应用卡保留确认时快照与已应用态
+            const adjSuperseded = adjOk && latestAdjustIdx > i && adjCard?.status !== 'applied'
             return (
               <div key={i} className={`ai-msg ai-msg--${m.role}`}>
                 <span className="ai-msg__avatar">{m.role === 'user' ? <User size={14} /> : <Bot size={14} />}</span>
                 <div className="ai-msg__body">
                   {m.role === 'assistant'
-                    ? <AiMarkdown content={proposal ? parsed.rest : m.content} />
+                    ? <AiMarkdown content={adjOk ? adjParsed.rest : proposal ? parsed.rest : m.content} />
                     : <div className="ai-msg__content">{m.content}</div>}
+                  {hasAdjustBlock && (
+                    <div className="ai-md__quote" style={{ marginTop: 6 }}>
+                      这条回复包含多个或不完整的调整方案标记块,已按普通文本显示;请让 AI 只输出一个调整方案。
+                    </div>
+                  )}
+                  {adjOk && adjCard && (
+                    <PlanAdjustmentCard
+                      previews={adjCard.previews}
+                      errors={adjCard.errors}
+                      warnings={adjCard.warnings}
+                      cardState={{ status: adjSuperseded ? 'superseded' : adjCard.status, error: adjCard.error }}
+                      busy={pending}
+                      onApply={() => handleApplyAdjustment(i)}
+                      onAdjust={handleAdjustPlan}
+                      onRefresh={() => handleRefreshAdjustment(i)}
+                    />
+                  )}
                   {proposal && (
                     <PlanProposalCard
                       proposal={proposal}

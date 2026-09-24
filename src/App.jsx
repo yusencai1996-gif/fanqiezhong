@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPersistentStore } from './data/store.js'
 import { createTimer } from './features/timer.js'
 import { summarizeToday } from './features/stats.js'
+// v0.7.0:应用前复检(过期→STALE_PREVIEW 零写入)。冻结签名见 PLAN 第三节。
+import { preparePlanAdjustmentApply } from './features/ai.js'
 import TaskList from './components/TaskList.jsx'
 import Timer from './components/Timer.jsx'
 import TodaySummary from './components/TodaySummary.jsx'
@@ -142,6 +144,67 @@ export default function App() {
       return { ok: true, created }
     } catch (e) {
       return { ok: false, error: e?.message || '写入失败' }
+    }
+  }
+
+  // v0.7.0 智能调计划:应用 AI 调整方案(只改计划 name/totalHours/deadline)。
+  // 安全顺序(PLAN 第六节 + 统筹裁决第 2 条):
+  //   同步 ref 防双击 → 重新 store.getState()(不依赖 render 闭包)→ preparePlanAdjustmentApply
+  //   完整复检(过期/身份不符→STALE_PREVIEW 零写入)→ 逐条 updatePlan(ops 由 ai.js 白名单重新构造,
+  //   不信任卡片传来的任何操作序列)→ 返回 ApplyResult。updatePlan 为同步纯内存写,预检已穷尽
+  //   现实失败模式;try/catch 兜底返回错误,不为本期单独做渲染层事务化(裁决:已知限制)。
+  const adjustApplyRef = useRef(false)
+  async function applyPlanAdjustment({ adjustment, expectedPreview } = {}) {
+    if (adjustApplyRef.current) return { ok: false, code: 'BUSY', error: '已有调整正在应用,请稍候' }
+    adjustApplyRef.current = true
+    const appliedIds = []   // 提到 try 外:catch 里能如实报告部分写入(专审建议)
+    try {
+      if (!store.isLoaded()) return { ok: false, code: 'NOT_READY', error: '数据尚未加载完成,请稍后重试' }
+      // v0.7.0 专审整改:读取失败会话不落盘,不能让调整报"已应用"误导用户
+      if (store.isLoadFailed && store.isLoadFailed()) {
+        return { ok: false, code: 'NOT_READY', error: '数据文件读取失败,本次会话不会保存任何改动;请重启应用后再调整' }
+      }
+      if (!adjustment || typeof adjustment !== 'object') {
+        return { ok: false, code: 'INVALID_ADJUSTMENT', error: '调整方案为空或格式异常' }
+      }
+      const recheck = preparePlanAdjustmentApply(adjustment, store.getState(), expectedPreview)
+      if (!recheck || typeof recheck !== 'object') {
+        return { ok: false, code: 'INVALID_ADJUSTMENT', error: '调整方案复检异常' }
+      }
+      if (recheck.stale) {
+        return {
+          ok: false, code: 'STALE_PREVIEW',
+          error: '预览已过期:相关计划在确认前已被修改,本次未写入。请重新查看后再应用',
+          previews: recheck.previews,
+        }
+      }
+      if (!recheck.ok) {
+        const first = (Array.isArray(recheck.errors) ? recheck.errors : [])[0]
+        const reason = typeof first === 'string' ? first : first?.message
+        return { ok: false, code: 'INVALID_ADJUSTMENT', error: `调整方案未通过校验${reason ? `:${reason}` : ''}`, previews: recheck.previews }
+      }
+      const ops = Array.isArray(recheck.ops) ? recheck.ops : []
+      if (!ops.length) return { ok: false, code: 'INVALID_ADJUSTMENT', error: '方案没有实际变化,无需应用' }
+      // v0.7.0 专审整改:整批形状预检提到循环前——不允许"前几条已写入才报已取消"
+      if (!ops.every(op => op && op.op === 'updatePlan' && typeof op.id === 'string'
+        && op.patch && typeof op.patch === 'object' && !Array.isArray(op.patch))) {
+        return { ok: false, code: 'INVALID_ADJUSTMENT', error: '操作序列异常,未应用任何调整' }
+      }
+      for (const op of ops) {
+        store.updatePlan(op.id, op.patch)
+        appliedIds.push(op.id)
+      }
+      console.info('plan adjustment applied:', appliedIds.join(','))
+      return { ok: true, appliedIds }
+    } catch (e) {
+      return {
+        ok: false, code: 'APPLY_FAILED', appliedIds,
+        error: (e?.message || '写入失败') + (appliedIds.length
+          ? `;前 ${appliedIds.length} 条调整可能已写入,请到「目标与科目」核对`
+          : ',未写入任何调整'),
+      }
+    } finally {
+      adjustApplyRef.current = false
     }
   }
 
@@ -478,13 +541,13 @@ export default function App() {
         <AiAssistantPanel
           open={aiOpen}
           config={aiConfig}
-          getStudyData={() => ({
-            sessions: state.sessions,
-            plans: state.plans,
-            subjects: state.subjects,
-            goals: state.goals,
-          })}
+          getStudyData={() => {
+            // v0.7.0:从 store 取最新(修 PLAN 第六节指出的 render 闭包旧数据问题),只返回四类学习数据
+            const s = store.getState()
+            return { sessions: s.sessions, plans: s.plans, subjects: s.subjects, goals: s.goals }
+          }}
           onApplyPlan={applyPlanProposal}
+          onApplyAdjustment={applyPlanAdjustment}
           onClose={() => setAiOpen(false)}
         />
       )}

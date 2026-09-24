@@ -1,6 +1,6 @@
 {
   "name": "pomodoro",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "桌面番茄钟 + 目标管理工具:专注计时、待办任务、目标计划、数据统计",
   "main": "electron/main.js",
   "scripts": {
