@@ -1,6 +1,10 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, globalShortcut, Notification } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { createStateGateway } = require('./ai-state')
+const { createAiService } = require('./ai-service')
+const { registerAiHandlers } = require('./ai-ipc')
+const { createPersist } = require('./persist')
 
 // ===== 单实例锁:只能开一个番茄钟 =====
 // 关键:必须用 else 包裹所有后续初始化!
@@ -27,21 +31,13 @@ if (!gotTheLock) {
     return path.join(app.getPath('userData'), 'data.json')
   }
 
-  function readState() {
-    try {
-      if (fs.existsSync(dataFile())) {
-        return JSON.parse(fs.readFileSync(dataFile(), 'utf-8'))
-      }
-    } catch (e) { console.error('read state failed', e) }
-    return null
-  }
+  // v0.5.0:IO 移入 persist.js(损坏自愈 + 原子写,两审阻断项整改)
+  const persist = createPersist({ getDataFile: dataFile })
+  const readState = persist.readState
+  const writeState = persist.writeState
 
-  function writeState(state) {
-    try {
-      fs.mkdirSync(path.dirname(dataFile()), { recursive: true })
-      fs.writeFileSync(dataFile(), JSON.stringify(state, null, 2), 'utf-8')
-    } catch (e) { console.error('write state failed', e) }
-  }
+  const gateway = createStateGateway({ readState, writeState })
+  const aiService = createAiService({ getPrivateConfig: () => gateway.getPrivateAiConfig() })
 
   let win = null
   let widget = null        // 小插件窗口
@@ -91,6 +87,7 @@ if (!gotTheLock) {
         win.hide()
       }
     })
+    win.on('closed', () => { aiService.cancelAll(); win = null })
   }
 
   // 小插件窗口:极简,无边框,常驻置顶
@@ -186,8 +183,9 @@ if (!gotTheLock) {
   }
 
   // ===== IPC handlers(只在持锁实例注册,避免重复) =====
-  ipcMain.handle('pomodoro:loadState', () => readState())
-  ipcMain.handle('pomodoro:saveState', (_e, state) => { writeState(state); return true })
+  ipcMain.handle('pomodoro:loadState', () => gateway.loadForRenderer())
+  ipcMain.handle('pomodoro:saveState', (_e, state) => gateway.saveFromRenderer(state))
+  registerAiHandlers({ ipcMain, getMainWindow: () => win, gateway, service: aiService })
 
   ipcMain.handle('pomodoro:setLoginItem', (_e, openAtLogin) => {
     app.setLoginItemSettings({ openAtLogin: !!openAtLogin })
@@ -264,6 +262,7 @@ if (!gotTheLock) {
 
   app.on('before-quit', () => {
     isQuiting = true
+    aiService.cancelAll()
     globalShortcut.unregisterAll()
     stopEndMonitor()
   })

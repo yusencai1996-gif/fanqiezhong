@@ -3,8 +3,9 @@ import { Settings } from 'lucide-react'
 // 设置面板:v0.3.9.2 起 overlay/panel/header 样式抽到独立 SettingsPanel.css(对齐其他弹层)
 import './SettingsPanel.css'
 import './Timer.css'
+import AiSettingsSection from './AiSettingsSection.jsx'   // v0.5.0 F1:AI 助手配置区
 
-export default function SettingsPanel({ settings, onChange, onClose }) {
+export default function SettingsPanel({ settings, onChange, onClose, aiConfig, onAiSave, onAiTest, onAiCancelTest }) {
   // 开机自启:从主进程读当前状态,改动时写回
   const [autoStart, setAutoStart] = useState(false)
   useEffect(() => {
@@ -68,6 +69,14 @@ export default function SettingsPanel({ settings, onChange, onClose }) {
           </label>
           <p className="settings-hint">开启后,电脑开机时番茄钟自动启动并缩到后台。</p>
         </div>
+
+        {/* v0.5.0 F1:AI 助手配置区(密钥草稿/掩码/清除/模型/连接测试;密钥不经 store) */}
+        <AiSettingsSection
+          config={aiConfig}
+          onSave={onAiSave}
+          onTest={onAiTest}
+          onCancelTest={onAiCancelTest}
+        />
 
         <button className="btn btn--primary" onClick={onClose}>完成</button>
       </div>

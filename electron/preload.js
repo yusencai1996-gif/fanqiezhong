@@ -5,6 +5,12 @@ contextBridge.exposeInMainWorld('pomodoroAPI', {
   // 状态读写
   loadState: () => ipcRenderer.invoke('pomodoro:loadState'),
   saveState: (state) => ipcRenderer.invoke('pomodoro:saveState', state),
+  // AI 配置与对话只能经具名主进程通道;主进程还会验证主窗口主 frame。
+  aiGetConfig: () => ipcRenderer.invoke('pomodoro:aiGetConfig'),
+  aiUpdateConfig: (patch) => ipcRenderer.invoke('pomodoro:aiUpdateConfig', patch),
+  aiTestConnection: (input) => ipcRenderer.invoke('pomodoro:aiTestConnection', input),
+  aiChat: (input) => ipcRenderer.invoke('pomodoro:aiChat', input),
+  aiCancel: (input) => ipcRenderer.invoke('pomodoro:aiCancel', input),
   // 开机自启
   setLoginItem: (open) => ipcRenderer.invoke('pomodoro:setLoginItem', open),
   getLoginItem: () => ipcRenderer.invoke('pomodoro:getLoginItem'),

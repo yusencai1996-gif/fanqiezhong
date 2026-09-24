@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMemoryStore, migrateState, CURRENT_SCHEMA_VERSION, evaluateRecovery } from '../src/data/store.js'
 import { todayPlanSummary } from '../src/features/planning.js'
 
@@ -529,7 +529,7 @@ describe('plan 迁移v6', () => {
       settings: { workMinutes: 25 },
     }
     const st = migrateState(v5)
-    expect(st.schemaVersion).toBe(9)
+    expect(st.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
     expect(st.plans).toEqual([])   // v6:补了空数组
     expect(st.activeFocus).toBeNull()   // v7:补了 null
     expect(st.settings.dailyGoalMinutes).toBe(30)   // v8:补了默认门槛
@@ -721,5 +721,105 @@ describe('异常退出恢复 v0.3.7', () => {
     store.archiveGoal(goalId)
     const s2 = store.getState()
     expect(todayPlanSummary(s2.sessions, s2.plans, s2.subjects)).toHaveLength(0)   // 归档后:排除
+  })
+})
+
+describe('恢复目标时修复幽灵计划', () => {
+  function setup() {
+    const store = createMemoryStore()
+    const goal = store.addGoal({ name: '目标' })
+    const subject = store.addSubject({ goalId: goal.id, name: '科目' })
+    const plan = store.addPlan({ subjectId: subject.id, name: '计划', totalHours: 4, deadline: '2026-09-30' })
+    return { store, goal, subject, plan }
+  }
+
+  it('归档科目→归档目标→恢复目标后，计划在目标页和今日计划可见', () => {
+    const { store, goal, subject, plan } = setup()
+    store.archiveSubject(subject.id)
+    expect(store.getState().plans[0].archived).toBe(true)
+    store.archiveGoal(goal.id)
+    store.unarchiveGoal(goal.id)
+    const state = store.getState()
+    expect(state.subjects[0].archived).toBe(false)
+    expect(state.plans.filter(p => !p.archived).map(p => p.id)).toContain(plan.id)
+    expect(todayPlanSummary(state.sessions, state.plans, state.subjects, new Date(2026, 8, 24))).toHaveLength(1)
+  })
+
+  it('单独归档的计划也随目标恢复', () => {
+    const { store, goal, plan } = setup()
+    store.archivePlan(plan.id)
+    store.archiveGoal(goal.id)
+    store.unarchiveGoal(goal.id)
+    expect(store.getState().plans[0].archived).toBe(false)
+  })
+
+  it('只恢复当前目标名下计划', () => {
+    const { store, goal } = setup()
+    const otherGoal = store.addGoal({ name: '其他' })
+    const otherSubject = store.addSubject({ goalId: otherGoal.id, name: '别科' })
+    const otherPlan = store.addPlan({ subjectId: otherSubject.id, totalHours: 2 })
+    store.archivePlan(otherPlan.id)
+    store.archiveGoal(goal.id)
+    store.unarchiveGoal(goal.id)
+    expect(store.getState().plans.find(p => p.id === otherPlan.id).archived).toBe(true)
+  })
+
+  it('已完成计划只恢复归档标记，其他字段不变', () => {
+    const { store, goal, plan } = setup()
+    store.setPlanStatus(plan.id, '已完成')
+    store.setPlanManualDaily(plan.id, '2026-09-24', 2)
+    store.archivePlan(plan.id)
+    const before = store.getState().plans[0]
+    store.archiveGoal(goal.id)
+    store.unarchiveGoal(goal.id)
+    expect(store.getState().plans[0]).toEqual({ ...before, archived: false })
+  })
+
+  it('重复恢复、空计划和不存在目标不会改动无关数据', () => {
+    const { store, goal } = setup()
+    store.archiveGoal(goal.id)
+    store.unarchiveGoal(goal.id)
+    const once = store.getState()
+    store.unarchiveGoal(goal.id)
+    store.unarchiveGoal('missing')
+    expect(store.getState()).toEqual(once)
+    store.deletePlan(once.plans[0].id)
+    store.unarchiveGoal(goal.id)
+    expect(store.getState().plans).toEqual([])
+  })
+})
+
+describe('persistent store: 读取失败保护(v0.5.0 复审 B1 回归)', () => {
+  it('loadState 失败时:本会话禁用自动落盘(防旧档被空状态覆盖),UI 仍解锁', async () => {
+    vi.stubGlobal('window', {
+      pomodoroAPI: {
+        loadState: () => Promise.reject(new Error('EISDIR/EBUSY')),
+        saveState: () => { throw new Error('saveState must not be called') },
+      },
+    })
+    const { createPersistentStore } = await import('../src/data/store.js')
+    const store = createPersistentStore()
+    store.addTask({ title: 'x' })   // 触发一次 emit(若落盘未停用会调 saveState 直接抛错)
+    await new Promise(r => setTimeout(r, 10))
+    expect(store.isLoaded()).toBe(true)        // UI 解锁
+    expect(store.isLoadFailed()).toBe(true)    // 但标记读取失败
+    vi.unstubAllGlobals()
+  })
+
+  it('loadState 失败后 emit 多次仍零落盘;正常加载时照常落盘', async () => {
+    const saved = []
+    vi.stubGlobal('window', {
+      pomodoroAPI: {
+        loadState: () => Promise.reject(new Error('io')),
+        saveState: s => { saved.push(s); return Promise.resolve(true) },
+      },
+    })
+    const { createPersistentStore } = await import('../src/data/store.js')
+    const store = createPersistentStore()
+    store.addTask({ title: 'a' })
+    store.addTask({ title: 'b' })
+    await new Promise(r => setTimeout(r, 10))
+    expect(saved).toHaveLength(0)
+    vi.unstubAllGlobals()
   })
 })

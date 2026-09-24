@@ -13,7 +13,8 @@ import CheckinPanel from './components/CheckinPanel.jsx'
 import ProgressPanel from './components/ProgressPanel.jsx'
 import DeadlineCountdown from './components/DeadlineCountdown.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
-import { Target, CalendarCheck, TrendingUp, BarChart3, Settings, RotateCcw, HelpCircle, Menu } from 'lucide-react'
+import AiAssistantPanel from './components/AiAssistantPanel.jsx'
+import { Target, CalendarCheck, TrendingUp, BarChart3, Settings, RotateCcw, HelpCircle, Menu, Sparkles } from 'lucide-react'
 
 export default function App() {
   const storeRef = useRef(null)
@@ -22,6 +23,7 @@ export default function App() {
 
   const [state, setState] = useState(store.getState())
   const [loaded, setLoaded] = useState(store.isLoaded())
+  const [loadFailed, setLoadFailed] = useState(store.isLoadFailed && store.isLoadFailed())   // v0.5.0 复审B1:读取失败提示
   const [mode, setMode] = useState('专注')
   // v0.3.12:activeTaskId 改读 store(持久化,防重启丢失)。下游用 const activeTaskId 引用,不需大改。
   const activeTaskId = state.activeTaskId
@@ -32,6 +34,12 @@ export default function App() {
   const [showProgress, setShowProgress] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)   // v0.3.15:小窗口折叠菜单展开态
+
+  // v0.5.0 AI 助手:aiConfig=null 表示未读取/桥不存在(此时两处入口都不显示)。
+  // 入口可见性只看 aiConfig.hasApiKey(宽屏顶栏 + 窄屏菜单同一数据源)。
+  const [aiConfig, setAiConfig] = useState(null)
+  const [aiOpen, setAiOpen] = useState(false)
+  const aiTestReqRef = useRef(null)   // 连接测试在途 requestId(供取消用)
 
   // v0.3.15:监听窗口宽度,小于960px时顶栏折叠成菜单按钮(防6按钮挤占计时区)
   const [narrow, setNarrow] = useState(typeof window !== 'undefined' && window.innerWidth < 960)
@@ -63,13 +71,56 @@ export default function App() {
     return () => clearTimeout(id)
   }, [recoveryNotice])
 
+  // v0.5.0 AI 助手:加载完成后读一次 AI 公开配置(掩码信息,不含明文密钥)。
+  // 桥不存在(旧版本/纯浏览器无 mock)时保持 null → 无入口、零请求。
+  useEffect(() => {
+    if (!loaded) return
+    const api = window.pomodoroAPI
+    if (!api?.aiGetConfig) return
+    let alive = true
+    api.aiGetConfig().then(res => { if (alive && res?.ok) setAiConfig(res.data) }).catch(() => {})
+    return () => { alive = false }
+  }, [loaded])
+
+  // AI 配置保存(密钥/清除/模型)。密钥全程不经 store.updateSettings。
+  async function handleAiSave(patch) {
+    const api = window.pomodoroAPI
+    if (!api?.aiUpdateConfig) return { ok: false, error: { code: 'FORBIDDEN', message: '', retryable: false } }
+    const res = await api.aiUpdateConfig(patch)
+    if (res.ok) {
+      setAiConfig(res.data)
+      // 清除成功:立即关闭助手面板;hasApiKey 变 false 后面板整体卸载,会话内存随之清空
+      if (patch.clearApiKey) setAiOpen(false)
+    }
+    return res
+  }
+
+  // 连接测试:使用已保存配置(最小测试消息,不带学习摘要)
+  async function handleAiTest() {
+    const api = window.pomodoroAPI
+    if (!api?.aiTestConnection) return { ok: false, error: { code: 'FORBIDDEN', message: '', retryable: false } }
+    const requestId = 'ai-test-' + Date.now().toString(36)
+    aiTestReqRef.current = requestId
+    try {
+      return await api.aiTestConnection({ requestId })
+    } finally {
+      if (aiTestReqRef.current === requestId) aiTestReqRef.current = null
+    }
+  }
+
+  function handleAiCancelTest() {
+    const api = window.pomodoroAPI
+    if (api?.aiCancel && aiTestReqRef.current) api.aiCancel({ requestId: aiTestReqRef.current })
+  }
+
   useEffect(() => {
     const unsub = store.subscribe(s => {
       setState(s)
       if (!loaded && store.isLoaded()) setLoaded(true)
+      if (!loadFailed && store.isLoadFailed && store.isLoadFailed()) setLoadFailed(true)
     })
     return unsub
-  }, [store, loaded])
+  }, [store, loaded, loadFailed])
 
   // 全局快捷键:Ctrl+Shift+Space 切换开始/暂停
   useEffect(() => {
@@ -304,6 +355,11 @@ export default function App() {
         onSetSubject={(id, subjectId) => store.setTaskSubject(id, subjectId)}
       />
       <main className="app__main">
+        {loadFailed && (
+          <div className="app__recovery-banner" role="alert">
+            ⚠ 数据文件读取失败:为防止覆盖原有数据,本次会话的改动不会保存。请重启应用重试;若持续出现,检查数据文件是否被其他程序占用。
+          </div>
+        )}
         {recoveryNotice && (
           <div className="app__recovery-banner">
             <RotateCcw size={16} /> 上次专注未正常结束，已自动恢复 {recoveryNotice.durationSec < 60
@@ -342,6 +398,9 @@ export default function App() {
               <>
                 <div className="app__menu-overlay" onClick={() => setMenuOpen(false)} />
                 <div className="app__menu-dropdown">
+                  {aiConfig?.hasApiKey && (
+                    <button onClick={() => { setAiOpen(true); setMenuOpen(false) }}><Sparkles size={16} /> AI 助手</button>
+                  )}
                   <button onClick={() => { setShowGoalManager(true); setMenuOpen(false) }}><Target size={16} /> 目标与科目</button>
                   <button onClick={() => { setShowCheckin(true); setMenuOpen(false) }}><CalendarCheck size={16} /> 打卡表</button>
                   <button onClick={() => { setShowProgress(true); setMenuOpen(false) }}><TrendingUp size={16} /> 进度预测</button>
@@ -354,8 +413,11 @@ export default function App() {
             )}
           </div>
         ) : (
-          // 宽屏:6按钮展开(原样)
+          // 宽屏:6按钮展开(原样)+ AI 助手入口(仅已配置密钥时显示)
           <>
+            {aiConfig?.hasApiKey && (
+              <button className="app__icon-btn" title="AI 助手" onClick={() => setAiOpen(true)}><Sparkles size={18} /></button>
+            )}
             <button className="app__icon-btn" title="目标与科目" onClick={() => setShowGoalManager(true)}><Target size={18} /></button>
             <button className="app__icon-btn" title="打卡表" onClick={() => setShowCheckin(true)}><CalendarCheck size={18} /></button>
             <button className="app__icon-btn" title="进度预测" onClick={() => setShowProgress(true)}><TrendingUp size={18} /></button>
@@ -372,6 +434,25 @@ export default function App() {
           settings={state.settings}
           onChange={(patch) => store.updateSettings(patch)}
           onClose={() => setShowSettings(false)}
+          aiConfig={aiConfig}
+          onAiSave={handleAiSave}
+          onAiTest={handleAiTest}
+          onAiCancelTest={handleAiCancelTest}
+        />
+      )}
+      {/* v0.5.0 AI 助手面板:已配置期间保持挂载,open 只控制弹层显隐——
+          关闭再开会话历史保留;清除密钥(hasApiKey→false)整体卸载,内存清空、请求随配置失效。 */}
+      {aiConfig?.hasApiKey && (
+        <AiAssistantPanel
+          open={aiOpen}
+          config={aiConfig}
+          getStudyData={() => ({
+            sessions: state.sessions,
+            plans: state.plans,
+            subjects: state.subjects,
+            goals: state.goals,
+          })}
+          onClose={() => setAiOpen(false)}
         />
       )}
       {showStats && (

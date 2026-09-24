@@ -30,7 +30,15 @@ out/
 *.tmp
 nul
 
+# 会话临时产物(任务书/脚本/截图/扫描)
+.tmp*
+.tmp-visual/
+.playwright-mcp/
+
 # 私人文件(仅本机使用,不进仓库)
 AGENTS.md
 启动番茄钟.bat
 .zcode/
+
+# 内部过程文档(需求文档公开,实施计划含本机信息不公开)
+docs/PLAN-*.md

@@ -5,7 +5,7 @@
 // P0-3:数据 schema 版本 + 迁移链。每加一次结构演进,版本号+1,加一个迁移函数。
 // 迁移从 state.schemaVersion(默认0=老数据)依次跑到 CURRENT_SCHEMA_VERSION。
 // 注意:产品版本 v0.3.x 与 schema 版本是两套编号(如产品 v0.3.7 = schema v7)。
-export const CURRENT_SCHEMA_VERSION = 9
+export const CURRENT_SCHEMA_VERSION = 10
 
 // 各版本迁移函数:输入 state,返回迁移后的 state(就地补字段)。
 // v0→v1: task 补 order(按 createdAt)
@@ -17,6 +17,7 @@ export const CURRENT_SCHEMA_VERSION = 9
 // v6→v7: activeFocus 补 null(进行中专注快照,供异常退出恢复用)
 // v7→v8: settings 补 dailyGoalMinutes(打卡表每日门槛,默认30分钟)
 // v8→v9: activeTaskId 补 null(当前选中任务,持久化防重启丢失)
+// v9→v10: settings 补 AI 配置;密钥由主进程私有网关保护
 const migrations = [
   // v0 → v1
   (s) => {
@@ -101,6 +102,22 @@ const migrations = [
   }),
   // v8 → v9: activeTaskId 补 null(当前选中任务,持久化防重启丢失)
   (s) => ({ ...s, activeTaskId: s.activeTaskId ?? null }),
+  // v9 → v10
+  (s) => {
+    const settings = s.settings && typeof s.settings === 'object' && !Array.isArray(s.settings) ? s.settings : {}
+    const aiConfig = settings.aiConfig && typeof settings.aiConfig === 'object' && !Array.isArray(settings.aiConfig) ? settings.aiConfig : {}
+    return {
+      ...s,
+      settings: {
+        ...settings,
+        aiConfig: {
+          ...aiConfig,
+          apiKey: typeof aiConfig.apiKey === 'string' ? aiConfig.apiKey : '',
+          model: ['deepseek-chat', 'deepseek-reasoner'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-chat',
+        },
+      },
+    }
+  },
 ]
 
 // 应用所有未跑的迁移,返回迁移后的 state + 更新 schemaVersion
@@ -111,7 +128,13 @@ export function migrateState(input) {
     st = migrations[v](st)
     v += 1
   }
-  return { ...st, schemaVersion: CURRENT_SCHEMA_VERSION }
+  const settings = st.settings && typeof st.settings === 'object' && !Array.isArray(st.settings) ? st.settings : {}
+  const aiConfig = settings.aiConfig && typeof settings.aiConfig === 'object' && !Array.isArray(settings.aiConfig) ? settings.aiConfig : {}
+  return {
+    ...st,
+    settings: { ...settings, aiConfig: { ...aiConfig, apiKey: typeof aiConfig.apiKey === 'string' ? aiConfig.apiKey : '', model: ['deepseek-chat', 'deepseek-reasoner'].includes(aiConfig.model) ? aiConfig.model : 'deepseek-chat' } },
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+  }
 }
 
 // v0.3.7 异常退出恢复:核心判定(纯函数,便于单测)。
@@ -160,6 +183,7 @@ export function createMemoryStore(initialState) {
       autoStartBreak: false,
       autoStartWork: false,
       dailyGoalMinutes: 30,   // v0.3.8:打卡表每日专注门槛(分钟),达标=打卡成功
+      aiConfig: { apiKey: '', model: 'deepseek-chat' },
     },
     goals: [],       // v0.3.0:目标(如"考研")
     subjects: [],    // v0.3.0:科目(如"数学"),归属 goal
@@ -341,12 +365,13 @@ export function createMemoryStore(initialState) {
       emit()
     },
     unarchiveGoal: (id) => {
-      // 恢复目标:连带恢复其下科目(与归档对称)。任务因归属还在,自动重新显示。
+      // 恢复目标:连带恢复其下科目和计划。任务因归属还在,自动重新显示。
       const subjectIds = new Set(state.subjects.filter(s => s.goalId === id).map(s => s.id))
       state = {
         ...state,
         goals: state.goals.map(g => g.id === id ? { ...g, archived: false } : g),
         subjects: state.subjects.map(s => subjectIds.has(s.id) ? { ...s, archived: false } : s),
+        plans: state.plans.map(p => subjectIds.has(p.subjectId) ? { ...p, archived: false } : p),
       }
       emit()
     },
@@ -574,24 +599,38 @@ export function createPersistentStore() {
   const store = createMemoryStore()
   const api = typeof window !== 'undefined' ? window.pomodoroAPI : null
   let loaded = !api || !api.loadState   // 无持久化(测试/浏览器)视为已加载
+  let loadFailed = false                // v0.5.0 复审 B1:读取失败标记(本会话停用自动落盘防覆盖旧档)
 
   if (api && api.loadState) {
-    // 启动时从磁盘恢复
+    // 启动时从磁盘恢复。三态(v0.5.0 复审 B1):
+    //   正常返回/已自愈的 null → 正常加载与落盘
+    //   读取失败(reject)→ 本会话禁用自动落盘,保护磁盘旧档不被空状态覆盖;UI 仍解锁(空状态+提示)
     api.loadState().then(saved => {
       if (saved) store.replaceState(saved)
       loaded = true
       // 加载完成触发一次空状态 emit,通知订阅者(让 App 重渲染解锁)
       store.replaceState(store.getState())
+    }).catch(() => {
+      loadFailed = true
+      loaded = true
+      console.error('loadState failed: 本次会话已停用自动保存,防止覆盖磁盘上的原有数据;重启应用可重试读取')
+      store.replaceState(store.getState())
     })
   }
 
-  // 变更即落盘(仅加载完成后落盘,避免默认空状态覆盖磁盘)
+  // 变更即落盘(仅加载完成且未发生读取失败时落盘)
   store.subscribe((state) => {
-    if (loaded && api && api.saveState) api.saveState(state)
+    if (loaded && !loadFailed && api && api.saveState) {
+      // v0.5.0:saveState 返回 Promise,失败结果异步比较(独立复审建议1)
+      api.saveState(state).then(ok => {
+        if (ok === false) console.error('saveState failed: 本次改动未落盘')
+      }).catch(() => console.error('saveState failed: 本次改动未落盘'))
+    }
   })
 
   return {
     ...store,
     isLoaded: () => loaded,
+    isLoadFailed: () => loadFailed,
   }
 }
